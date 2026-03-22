@@ -220,6 +220,8 @@
             <div class="tool-sep"></div>
             <button class="tool-btn"        id="btn-sink"    title="Place Sink">⬜ Sink</button>
             <button class="tool-btn"        id="btn-cooktop" title="Place Cooktop">⊞ Cooktop</button>
+            <button class="tool-btn"        id="btn-outlet"  title="Place Outlet (2×4&quot;)">▭ Outlet</button>
+            <button class="tool-btn"        id="btn-bocci"   title="Place Bocci Outlet (2&quot; circle)">◯ Bocci</button>
             <div class="tool-sep"></div>
             <button class="tool-btn danger" id="btn-delete"  title="Delete Selected (Del)">✕ Delete</button>
             <button class="tool-btn"        id="btn-undo"    title="Undo (Ctrl+Z)">↩ Undo</button>
@@ -1038,12 +1040,42 @@ function drawShape(s, sel) {
 
     // 1. Fill
     let fill;
-    if (s.subtype === 'sink_overmount' || s.subtype === 'sink_undermount')
-        fill = sel ? 'rgba(80,150,210,0.18)' : 'rgba(190,225,248,0.92)';
+    if (s.subtype === 'sink_overmount')
+        fill = sel ? 'rgba(10,25,80,0.35)' : 'rgba(18,42,120,0.82)';
+    else if (s.subtype === 'sink_undermount')
+        fill = sel ? 'rgba(50,180,50,0.25)' : 'rgba(160,240,140,0.90)';
     else if (s.subtype === 'cooktop')
         fill = sel ? 'rgba(210,140,40,0.18)' : 'rgba(255,240,200,0.94)';
     else
         fill = sel ? 'rgba(201,168,76,0.12)' : 'rgba(218,230,248,0.88)';
+    // ── Outlet: dashed rect + label (early return, no standard border) ──
+    if (s.subtype === 'outlet') {
+        ctx.fillStyle = 'rgba(60,60,60,0.15)';
+        ctx.fillRect(s.x, s.y, s.w, s.h);
+        ctx.save(); ctx.setLineDash([3,2]);
+        ctx.strokeStyle = sel ? '#b09030' : '#555'; ctx.lineWidth = sel ? 1.5 : 1;
+        ctx.strokeRect(s.x, s.y, s.w, s.h); ctx.restore();
+        const olx = s.x + s.w/2;
+        ctx.font = 'bold 12px Raleway,sans-serif'; ctx.fillStyle = '#111';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText('OUTLET', olx, s.y + s.h + 3);
+        return;
+    }
+
+    // ── Bocci: circle + label (early return, no rect) ──
+    if (s.subtype === 'bocci') {
+        const br = s.w / 2, bcx = s.x + br, bcy = s.y + br;
+        ctx.beginPath(); ctx.arc(bcx, bcy, br, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(60,60,60,0.15)'; ctx.fill();
+        ctx.save(); ctx.setLineDash([3,2]);
+        ctx.strokeStyle = sel ? '#b09030' : '#555'; ctx.lineWidth = sel ? 1.5 : 1;
+        ctx.stroke(); ctx.restore();
+        ctx.font = 'bold 12px Raleway,sans-serif'; ctx.fillStyle = '#111';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText('BOCCI', bcx, bcy + br + 3);
+        return;
+    }
+
     roundedRectPath(ctx, s.x, s.y, s.w, s.h, r);
     ctx.fillStyle = fill;
     ctx.fill();
@@ -1221,13 +1253,14 @@ function drawShapeLabel(s) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
     if (s.subtype === 'sink_overmount' || s.subtype === 'sink_undermount') {
-        ctx.fillStyle = '#1a4060';
+        const isOver = s.subtype === 'sink_overmount';
+        ctx.fillStyle = isOver ? '#d0e8ff' : '#1a4a10';
         if (s.w >= 36 && s.h >= 24) {
             ctx.font = 'bold 10px Raleway,sans-serif'; ctx.fillText('SINK', cx, cy - 8);
             ctx.font = '9px Raleway,sans-serif';
-            ctx.fillText(s.subtype === 'sink_overmount' ? 'OVERMOUNT' : 'UNDERMOUNT', cx, cy + 5);
+            ctx.fillText(isOver ? 'OVERMOUNT' : 'UNDERMOUNT', cx, cy + 5);
             if (s.w >= 48 && s.h >= 36) {
-                ctx.fillStyle = '#4a7a9a'; ctx.font = '8px Raleway,sans-serif';
+                ctx.fillStyle = isOver ? '#a0c8e8' : '#3a7a28'; ctx.font = '8px Raleway,sans-serif';
                 ctx.fillText(`${pxToIn(s.w)}″ × ${pxToIn(s.h)}″`, cx, cy + 17);
             }
         } else { ctx.font = 'bold 8px Raleway,sans-serif'; ctx.fillText('S', cx, cy); }
@@ -1933,6 +1966,22 @@ cv.addEventListener('mousedown', e => {
         nextId++; persist(); render(); updateStatus(); return;
     }
 
+    // ── Outlet ──
+    if (tool === 'outlet') {
+        const wPx = 2*INCH, hPx = 4*INCH;
+        pushUndo();
+        shapes.push(normalizeShape({ id:nextId, label:`P${nextId}`, x:clamp(sx,0,CW-wPx), y:clamp(sy,0,CH-hPx), w:wPx, h:hPx, subtype:'outlet' }));
+        nextId++; persist(); render(); updateStatus(); return;
+    }
+
+    // ── Bocci ──
+    if (tool === 'bocci') {
+        const wPx = 3*INCH;
+        pushUndo();
+        shapes.push(normalizeShape({ id:nextId, label:`P${nextId}`, x:clamp(sx,0,CW-wPx), y:clamp(sy,0,CH-wPx), w:wPx, h:wPx, subtype:'bocci' }));
+        nextId++; persist(); render(); updateStatus(); return;
+    }
+
     // ── Radius ──
     if (tool === 'radius') {
         const corner = nearestCorner(p.x, p.y);
@@ -2228,17 +2277,17 @@ document.getElementById('text-content').addEventListener('keydown', e => {
 });
 
 // ─────────────────────────────────────────────────────────────
-const TOOL_BTNS = { draw:'btn-draw', ldraw:'btn-ldraw', bsp:'btn-bsp', select:'btn-select', radius:'btn-radius', edge:'btn-edge', joint:'btn-joint', sink:'btn-sink', cooktop:'btn-cooktop', text:'btn-text' };
+const TOOL_BTNS = { draw:'btn-draw', ldraw:'btn-ldraw', bsp:'btn-bsp', select:'btn-select', radius:'btn-radius', edge:'btn-edge', joint:'btn-joint', sink:'btn-sink', cooktop:'btn-cooktop', outlet:'btn-outlet', bocci:'btn-bocci', text:'btn-text' };
 function setTool(t) {
     ghostText = null; // cancel any floating text
     tool = t; selected = null; selectedJoint = null;
     drawing = false; moving = false; resizing = false; draggingJoint = false;
     hovCorner = null; hovEdge = null; hovCornerEdge = null;
     selectedText = null;
-    cv.style.cursor = ['draw','ldraw','bsp','sink','cooktop','radius','edge','joint'].includes(t) ? 'crosshair' : 'default';
+    cv.style.cursor = ['draw','ldraw','bsp','sink','cooktop','outlet','bocci','radius','edge','joint'].includes(t) ? 'crosshair' : 'default';
     document.getElementById('edge-palette').style.display = t === 'edge' ? 'flex' : 'none';
     Object.entries(TOOL_BTNS).forEach(([k,id]) => document.getElementById(id).classList.toggle('active', k === t));
-    const labels = { draw:'Draw Rectangle', ldraw:'Draw L-Shape', bsp:'Draw Backsplash', select:'Select / Move', radius:'Add Radius', edge:'Edge Profile', joint:'Joint Line', sink:'Sink', cooktop:'Cooktop', text:'Add Text' };
+    const labels = { draw:'Draw Rectangle', ldraw:'Draw L-Shape', bsp:'Draw Backsplash', select:'Select / Move', radius:'Add Radius', edge:'Edge Profile', joint:'Joint Line', sink:'Sink', cooktop:'Cooktop', outlet:'Outlet (2×4")', bocci:'Bocci Outlet (2" circle)', text:'Add Text' };
     document.getElementById('st-tool').innerHTML = `Tool: <b>${labels[t]||t}</b>`;
     render();
 }
