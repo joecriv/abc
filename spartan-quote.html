@@ -1,0 +1,3548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spartan Installations — Countertop Quote</title>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        /* ── Spartan Brand Palette ──────────────────────────────
+           Primary:  #0B3023  (dark forest green)
+           Accent:   #b09030  (bright green — readable on dark)
+           BG:       #1c2008  (very dark green)
+           Panel:    #141806  (header / right panel)
+           Surface:  #202810  (tool buttons / cards)
+           Border:   #2c3812  (subtle) / #3c4e18 (mid)
+        ── ─────────────────────────────────────────────────── */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Raleway', sans-serif; background: #1c2008; color: #d8cfa8; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        header { background: #2d3a10; padding: 10px 20px; display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #b09030; flex-shrink: 0; }
+        header h1 { font-size: 18px; font-weight: 700; color: #ffffff; letter-spacing: 1.5px; }
+        header span { font-size: 13px; color: #b09030; }
+        .app-body { display: flex; flex: 1; overflow: hidden; }
+
+        /* ── Left panel ── */
+        .canvas-panel { display: flex; flex-direction: column; flex: 1; padding: 10px 10px 6px 10px; overflow: hidden; min-width: 0; }
+        .toolbar { display: flex; gap: 5px; margin-bottom: 8px; align-items: center; flex-shrink: 0; flex-wrap: wrap; }
+        .tool-btn { background: #202810; color: #a89860; border: 1px solid #3c4e18; padding: 6px 11px; border-radius: 5px; cursor: pointer; font-family: 'Raleway', sans-serif; font-size: 12px; font-weight: 500; transition: background .12s, border-color .12s, color .12s; white-space: nowrap; }
+        .tool-btn:hover { background: #2a3612; border-color: #b09030; color: #b09030; }
+        .tool-btn.active { background: #2d3a10; color: #ffffff; border-color: #b09030; font-weight: 700; }
+        .tool-btn.danger:hover { border-color: #e05c5c; color: #e05c5c; }
+        .tool-sep { width: 1px; height: 26px; background: #3c4e18; margin: 0 2px; flex-shrink: 0; }
+        #edge-palette { display:none; gap:6px; align-items:center; padding:4px 2px 7px; flex-shrink:0; flex-wrap:wrap; border-bottom:1px solid #2c3812; margin-bottom:5px; }
+        #edge-palette > label { font-size:10px; color:#887a50; font-weight:600; text-transform:uppercase; letter-spacing:.4px; white-space:nowrap; }
+        .ep-btn { padding:4px 11px; border-radius:4px; border:2px solid #3c4e18; background:#202810; font-family:'Raleway',sans-serif; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all .12s; }
+        .ep-btn:hover { border-color:#b09030; }
+        .ep-btn.ep-active { background:#1e2808; border-color:currentColor; box-shadow:0 0 6px rgba(176,144,48,0.25); }
+        .ep-hint { font-size:10px; color:#5a5230; margin-left:4px; }
+        .canvas-scroll { flex: 1; overflow: auto; background: #101806; border-radius: 4px; }
+        .canvas-grid-wrap { display: inline-flex; flex-direction: column; }
+        .canvas-top-row, .canvas-main-row { display: flex; }
+        canvas { display: block; }
+        #mainCanvas { cursor: crosshair; }
+
+        /* ── Right panel ── */
+        .form-panel { width: 300px; min-width: 300px; background: #141806; border-left: 2px solid #2c3812; padding: 14px 12px 20px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+        .form-panel h2 { font-size: 12px; font-weight: 700; color: #b09030; letter-spacing: .8px; text-transform: uppercase; border-bottom: 1px solid #2c3812; padding-bottom: 6px; }
+        .placeholder-block { background: #1c2408; border: 1px dashed #2c3812; border-radius: 5px; padding: 11px 10px; color: #5a5230; font-size: 11px; text-align: center; line-height: 1.6; }
+        .legend-table { width: 100%; border-collapse: collapse; }
+        .legend-table td { padding: 3px 3px; vertical-align: middle; }
+        .legend-table tr:not(:last-child) td { border-bottom: 1px solid #1c2408; }
+        .leg-abbr { font-size: 10px; font-weight: 700; padding: 1px 4px; border-radius: 3px; background: rgba(255,255,255,0.05); display: inline-block; min-width: 28px; text-align: center; }
+        .leg-name { font-size: 10px; color: #806c50; padding-left: 4px; }
+        .leg-swatch-cell canvas { vertical-align: middle; }
+        .fp-field { margin-bottom: 2px; }
+        .fp-label { font-size: 10px; color: #887a50; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; display: block; }
+        .fp-input { width: 100%; background: #0e1606; border: 1px solid #2c3812; border-radius: 4px; color: #d8cfa8; font-family: 'Raleway', sans-serif; font-size: 12px; padding: 5px 8px; outline: none; transition: border-color .12s; }
+        .fp-input:focus { border-color: #b09030; }
+        .fp-input[readonly] { color: #5a5230; background: #050c07; cursor: default; }
+        .fp-select { width: 100%; background: #0e1606; border: 1px solid #2c3812; border-radius: 4px; color: #d8cfa8; font-family: 'Raleway', sans-serif; font-size: 11px; padding: 5px 7px; outline: none; transition: border-color .12s; }
+        .fp-select:focus { border-color: #b09030; }
+        .fp-textarea { width: 100%; background: #0e1606; border: 1px solid #2c3812; border-radius: 4px; color: #d8cfa8; font-family: 'Raleway', sans-serif; font-size: 11px; padding: 6px 8px; outline: none; resize: vertical; min-height: 64px; transition: border-color .12s; line-height: 1.5; }
+        .fp-textarea:focus { border-color: #b09030; }
+        .mat-row { background: #1c2008; border: 1px solid #2c3812; border-radius: 5px; padding: 8px 8px 6px; margin-bottom: 6px; position: relative; }
+        .mat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; }
+        .mat-remove { position: absolute; top: 5px; right: 7px; background: none; border: none; color: #5a5230; font-size: 15px; line-height: 1; cursor: pointer; padding: 0; font-family: monospace; }
+        .mat-remove:hover { color: #e05c5c; }
+        .mat-lbl { font-size: 9px; color: #6a5a38; font-weight: 600; text-transform: uppercase; margin-bottom: 2px; display: block; }
+        .mat-input { width: 100%; background: #141806; border: 1px solid #2c3812; border-radius: 3px; color: #c8b888; font-family: 'Raleway', sans-serif; font-size: 11px; padding: 4px 6px; outline: none; transition: border-color .1s; }
+        .mat-input:focus { border-color: #b09030; }
+        .add-mat-btn { width: 100%; padding: 6px; background: #1c2008; border: 1px dashed #2c3812; border-radius: 4px; color: #b09030; font-family: 'Raleway', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; transition: all .12s; letter-spacing: .3px; }
+        .add-mat-btn:hover { background: #222e0a; border-color: #b09030; }
+        .piece-tbl { width: 100%; border-collapse: collapse; font-size: 10px; }
+        .piece-tbl th { color: #b09030; font-weight: 700; text-align: left; padding: 3px 4px; border-bottom: 1px solid #2c3812; font-size: 9px; text-transform: uppercase; letter-spacing: .4px; }
+        .piece-tbl td { color: #9a8a60; padding: 4px 4px; border-bottom: 1px solid #1c2008; vertical-align: middle; }
+        .piece-tbl tr:last-child td { border-bottom: none; }
+        .ll-row { display: flex; align-items: center; gap: 7px; padding: 4px 2px; border-bottom: 1px solid #1c2008; }
+        .ll-row:last-child { border-bottom: none; }
+        .ll-abbr { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: rgba(255,255,255,0.05); min-width: 30px; text-align: center; display: inline-block; }
+        .ll-name { font-size: 10px; color: #806c50; flex: 1; }
+        .ll-empty { font-size: 10px; color: #5a5230; font-style: italic; }
+
+        /* ── Popups ── */
+        .popup-box { display: none; position: fixed; background: #1c2408; border: 1.5px solid #b09030; border-radius: 8px; padding: 13px 15px 11px; box-shadow: 0 6px 24px rgba(0,0,0,.7); z-index: 1000; min-width: 210px; font-family: 'Raleway', sans-serif; }
+        .popup-box h3 { font-size: 11px; font-weight: 700; color: #b09030; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 11px; }
+        .pop-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+        .pop-row label { font-size: 11px; color: #a89860; white-space: nowrap; }
+        .pop-row label span { color: #5a5230; font-size: 10px; }
+        .pop-row input[type=number], .pop-row input[type=text] { width: 82px; background: #141806; border: 1px solid #3c4e18; border-radius: 4px; color: #d8cfa8; font-family: 'Raleway', sans-serif; font-size: 13px; font-weight: 600; padding: 5px 7px; text-align: right; outline: none; transition: border-color .12s; }
+        .pop-row input[type=text] { text-align: left; width: 120px; }
+        .pop-row input:focus { border-color: #b09030; }
+        .pop-row select { width: 145px; background: #141806; border: 1px solid #3c4e18; border-radius: 4px; color: #d8cfa8; font-family: 'Raleway', sans-serif; font-size: 11px; padding: 5px 6px; outline: none; }
+        .pop-row select:focus { border-color: #b09030; }
+        .pop-hint { font-size: 10px; color: #5a5230; margin-bottom: 9px; line-height: 1.5; }
+        .pop-btns { display: flex; gap: 7px; margin-top: 3px; }
+        .pop-btns button { flex: 1; padding: 6px 0; border-radius: 4px; border: 1px solid #3c4e18; font-family: 'Raleway', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; transition: all .12s; }
+        .pop-ok     { background: #2d3a10 !important; color: #ffffff !important; border-color: #b09030 !important; }
+        .pop-ok:hover  { background: #123d2a !important; }
+        .pop-cancel { background: #202810 !important; color: #887a50 !important; }
+        .pop-cancel:hover { border-color: #e05c5c !important; color: #e05c5c !important; }
+        .toggle-row { display: flex; gap: 5px; margin-bottom: 9px; }
+        .tog-btn { flex: 1; padding: 6px 0; border-radius: 4px; border: 1px solid #3c4e18; background: #202810; color: #887a50; font-family: 'Raleway', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; text-align: center; transition: all .12s; }
+        .tog-btn.active { background: #2d3a10; color: #ffffff; border-color: #b09030; }
+        .tog-btn:hover:not(.active) { border-color: #b09030; color: #b09030; }
+
+        /* ── L-Shape 6-field grid ── */
+        .ls-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; margin-bottom: 8px; }
+        .ls-field { display: flex; align-items: center; gap: 5px; }
+        .ls-lbl { font-size: 14px; font-weight: 700; color: #b09030; min-width: 14px; text-align: center; }
+        .ls-lbl.auto { color: #5a5230; }
+        .ls-inp { width: 64px; background: #141806; border: 1px solid #3c4e18; border-radius: 4px; color: #d8cfa8; font-family:'Raleway',sans-serif; font-size: 12px; font-weight: 600; padding: 4px 6px; text-align: right; outline: none; transition: border-color .12s; }
+        .ls-inp:focus { border-color: #b09030; }
+        .ls-inp.auto { color: #5a5230; border-style: dashed; font-style: italic; }
+        .ls-unit { font-size: 10px; color: #5a5230; }
+
+        /* ── Phase 4 action buttons ── */
+        .act-btn { width: 100%; padding: 8px 10px; border-radius: 5px; border: 1px solid #3c4e18; background: #1c2408; color: #a89860; font-family: 'Raleway', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; transition: background .12s, border-color .12s, color .12s; }
+        .act-btn:hover { background: #2a3612; border-color: #b09030; color: #b09030; }
+        .act-btn.act-primary { background: #2d3a10; color: #ffffff; border-color: #b09030; }
+        .act-btn.act-primary:hover { background: #123d2a; }
+        .act-btn.act-danger:hover { border-color: #e05c5c; color: #e05c5c; }
+        .act-btns { display: flex; flex-direction: column; gap: 6px; }
+
+        /* ── Panel tab switcher ── */
+        .panel-tabs { display: flex; gap: 3px; padding-bottom: 10px; border-bottom: 1px solid #2c3812; margin-bottom: 4px; }
+        .panel-tab { flex: 1; padding: 6px 8px; border-radius: 4px; border: 1px solid #2c3812; background: #1c2008; color: #6a5a38; font-family: 'Raleway', sans-serif; font-size: 11px; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: .5px; transition: all .12s; text-align: center; }
+        .panel-tab:hover { border-color: #b09030; color: #b09030; }
+        .panel-tab.active { background: #2d3a10; color: #ffffff; border-color: #b09030; }
+
+        /* ── Pricing panel ── */
+        .cost-row { background: #1c2008; border: 1px solid #2c3812; border-radius: 5px; padding: 8px 8px 6px; margin-bottom: 6px; }
+        .cost-row-header { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+        .cost-name-inp { flex: 1; min-width: 0; background: #141806; border: 1px solid #2c3812; border-radius: 3px; color: #c8b888; font-family: 'Raleway', sans-serif; font-size: 11px; font-weight: 600; padding: 4px 6px; outline: none; transition: border-color .1s; }
+        .cost-name-inp:focus { border-color: #b09030; }
+        .cost-amt-inp { width: 82px; background: #141806; border: 1px solid #2c3812; border-radius: 3px; color: #c8b888; font-family: 'Raleway', sans-serif; font-size: 11px; font-weight: 600; padding: 4px 6px; text-align: right; outline: none; transition: border-color .1s; }
+        .cost-amt-inp:focus { border-color: #b09030; }
+        .cost-remove { background: none; border: none; color: #5a5230; font-size: 16px; cursor: pointer; padding: 0 2px; font-family: monospace; line-height: 1; flex-shrink: 0; }
+        .cost-remove:hover { color: #e05c5c; }
+        .cost-mat-label { flex: 1; font-size: 11px; font-weight: 700; color: #d8cfa8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cost-byroom-toggle { font-size: 9px; color: #5a5230; cursor: pointer; padding: 2px 6px; border: 1px solid #2c3812; border-radius: 3px; background: none; font-family: 'Raleway', sans-serif; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; transition: all .1s; white-space: nowrap; }
+        .cost-byroom-toggle:hover, .cost-byroom-toggle.on { border-color: #b09030; color: #b09030; }
+        .cost-room-rows { margin-top: 6px; border-top: 1px solid #2c3812; padding-top: 6px; }
+        .cost-room-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+        .cost-room-label { font-size: 10px; color: #887a50; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cost-room-inp { width: 80px; background: #141806; border: 1px solid #2c3812; border-radius: 3px; color: #c8b888; font-family: 'Raleway', sans-serif; font-size: 11px; padding: 3px 5px; text-align: right; outline: none; transition: border-color .1s; }
+        .cost-room-inp:focus { border-color: #b09030; }
+        .extra-row { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }
+        .extra-desc-inp { flex: 1; min-width: 0; background: #141806; border: 1px solid #2c3812; border-radius: 3px; color: #c8b888; font-family: 'Raleway', sans-serif; font-size: 11px; padding: 4px 6px; outline: none; transition: border-color .1s; }
+        .extra-desc-inp:focus { border-color: #b09030; }
+        .extra-amt-inp { width: 80px; background: #141806; border: 1px solid #2c3812; border-radius: 3px; color: #c8b888; font-family: 'Raleway', sans-serif; font-size: 11px; padding: 4px 6px; text-align: right; outline: none; transition: border-color .1s; }
+        .extra-amt-inp:focus { border-color: #b09030; }
+        .extra-remove { background: none; border: none; color: #5a5230; font-size: 16px; cursor: pointer; padding: 0 2px; font-family: monospace; flex-shrink: 0; }
+        .extra-remove:hover { color: #e05c5c; }
+        .price-meta-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+        .price-meta-lbl { font-size: 10px; color: #887a50; flex: 1; }
+        .price-rate-inp { width: 80px; background: #0e1606; border: 1px solid #2c3812; border-radius: 3px; color: #d8cfa8; font-family: 'Raleway', sans-serif; font-size: 11px; padding: 4px 6px; text-align: right; outline: none; transition: border-color .1s; }
+        .price-rate-inp:focus { border-color: #b09030; }
+        .price-calc-total { font-size: 11px; color: #b09030; font-weight: 700; min-width: 54px; text-align: right; }
+        .sum-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #1c2008; font-size: 11px; color: #9a8a60; }
+        .sum-row:last-child { border-bottom: none; }
+        .sum-row.grand { font-size: 13px; font-weight: 700; color: #d8cfa8; border-top: 1px solid #3c4e18; margin-top: 2px; padding-top: 8px; }
+        .sum-row.deposit { color: #b09030; font-weight: 600; }
+        .sum-val { font-weight: 600; }
+        .sum-row.grand .sum-val { color: #b09030; font-size: 14px; }
+        .price-internal-note { font-size: 9px; color: #5a5230; font-style: italic; margin-bottom: 8px; }
+        /* ── Room pricing sections ── */
+        .room-pricing-section { background: #1c2008; border: 1px solid #2c3812; border-radius: 5px; padding: 8px 8px 8px; margin-bottom: 10px; }
+        .room-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; padding-bottom: 5px; border-bottom: 1px solid #2c3812; }
+        .room-section-name { font-size: 12px; font-weight: 700; color: #b09030; }
+        .room-section-sqft { font-size: 10px; color: #5a5230; }
+        .room-install-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+        .room-install-row .mat-lbl { margin-bottom: 0; min-width: 100px; flex-shrink: 0; }
+        .room-price-check { margin-top: 8px; border-top: 1px solid #2c3812; padding-top: 7px; }
+        .price-check-label { font-size: 9px; color: #5a5230; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+        .price-check-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; }
+        .price-check-name { font-size: 10px; color: #9a8a60; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55%; }
+        .price-check-val { font-size: 11px; font-weight: 700; color: #b09030; }
+        .price-check-empty { font-size: 9px; color: #3a3218; font-style: italic; }
+
+        /* ── Page tabs ── */
+        #page-tabs { background: #0e1606; border-bottom: 2px solid #2c3812; display: flex; align-items: flex-end; gap: 2px; padding: 0 10px; flex-shrink: 0; overflow-x: auto; }
+        .pg-tab { padding: 5px 12px 4px; border: 1px solid #2c3812; border-bottom: none; border-radius: 5px 5px 0 0; background: #1c2008; color: #6a5a38; font-family: 'Raleway', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px; transition: background .1s, color .1s; user-select: none; }
+        .pg-tab:hover { background: #222e0a; color: #a89860; }
+        .pg-tab.active { background: #1c2008; color: #b09030; border-color: #b09030; position: relative; bottom: -2px; padding-bottom: 6px; }
+        .pg-tab-name { outline: none; background: none; border: none; color: inherit; font-family: inherit; font-size: inherit; font-weight: inherit; cursor: text; min-width: 10px; max-width: 120px; }
+        .pg-tab-del { font-size: 13px; color: #5a5230; line-height: 1; padding: 0 1px; cursor: pointer; }
+        .pg-tab-del:hover { color: #e05c5c; }
+        #pg-add { padding: 5px 10px 4px; border: 1px dashed #2c3812; border-bottom: none; border-radius: 5px 5px 0 0; background: none; color: #5a5230; font-family: 'Raleway', sans-serif; font-size: 13px; cursor: pointer; margin-left: 2px; transition: color .1s; }
+        #pg-add:hover { color: #b09030; border-color: #b09030; }
+
+        /* ── Status bar ── */
+        .status-bar { background: #0e1606; border-top: 1px solid #1a1e08; padding: 4px 12px; font-size: 11px; color: #5a5230; display: flex; gap: 20px; flex-shrink: 0; }
+        .status-bar span b { color: #b09030; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<header>
+    <img src="data:image/png;base64,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" id="app-logo" alt="Spartan Logo" style="height:38px;width:auto;"><h1>SPARTAN INSTALLATIONS INC.</h1>
+    <span>Countertop Quote Tool</span>
+</header>
+
+<div id="page-tabs">
+    <!-- tabs rendered by JS -->
+    <button id="pg-add" title="Add Page">+</button>
+</div>
+
+<div class="app-body">
+    <div class="canvas-panel">
+        <div class="toolbar">
+            <button class="tool-btn active" id="btn-draw"    title="Draw Rectangle (R)">▭ Rectangle</button>
+            <button class="tool-btn"        id="btn-ldraw"   title="Draw L-Shape">⌐ L-Shape</button>
+            <button class="tool-btn"        id="btn-bsp"     title="Draw Backsplash (T-shape)">⊤ Backsplash</button>
+            <button class="tool-btn"        id="btn-select"  title="Select / Move (S)">↖ Select</button>
+            <div class="tool-sep"></div>
+            <button class="tool-btn"        id="btn-radius"  title="Add Corner Radius">⌒ Radius</button>
+            <button class="tool-btn"        id="btn-edge"    title="Assign Edge Profile">┤ Edge Profile</button>
+            <button class="tool-btn"        id="btn-joint"   title="Insert Joint Line">⋮ Joint</button>
+            <button class="tool-btn"        id="btn-text"    title="Add Text Annotation">T Text</button>
+            <div class="tool-sep"></div>
+            <button class="tool-btn"        id="btn-sink"    title="Place Sink">⬜ Sink</button>
+            <button class="tool-btn"        id="btn-cooktop" title="Place Cooktop">⊞ Cooktop</button>
+            <button class="tool-btn"        id="btn-outlet"  title="Place Outlet (2×4&quot;)">▭ Outlet</button>
+            <button class="tool-btn"        id="btn-bocci"   title="Place Bocci Outlet (2&quot; circle)">◯ Bocci</button>
+            <div class="tool-sep"></div>
+            <button class="tool-btn danger" id="btn-delete"  title="Delete Selected (Del)">✕ Delete</button>
+            <button class="tool-btn"        id="btn-undo"    title="Undo (Ctrl+Z)">↩ Undo</button>
+        </div>
+
+        <div id="edge-palette">
+            <label>Active Profile:</label>
+            <button class="ep-btn ep-active" data-etype="polished" style="color:#dd0000">POL</button>
+            <button class="ep-btn" data-etype="mitered" style="color:#7a3000">MT</button>
+            <button class="ep-btn" data-etype="special" style="color:#228B22">SF</button>
+            <button class="ep-btn" data-etype="waterfall" style="color:#006688">WF</button>
+            <button class="ep-btn" data-etype="none" style="color:#777">✕ None</button>
+            <span class="ep-hint">Click any edge or arc to assign</span>
+        </div>
+
+        <div class="canvas-scroll">
+            <div class="canvas-grid-wrap">
+                <div class="canvas-top-row">
+                    <canvas id="rulerCorner" width="28" height="28"></canvas>
+                    <canvas id="rulerH"      width="960" height="28"></canvas>
+                </div>
+                <div class="canvas-main-row">
+                    <canvas id="rulerV"      width="28" height="720"></canvas>
+                    <canvas id="mainCanvas"  width="960" height="720"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right panel -->
+    <div class="form-panel">
+
+        <!-- Panel tab switcher -->
+        <div class="panel-tabs">
+            <button class="panel-tab active" id="ptab-layout">Layout</button>
+            <button class="panel-tab" id="ptab-pricing">Pricing</button>
+        </div>
+
+        <!-- ── Layout panel ── -->
+        <div id="layout-panel">
+
+            <h2>Job Details</h2>
+            <div class="fp-field"><label class="fp-label">Order #</label><input class="fp-input" id="f-order" type="text" placeholder="e.g. 2026-001"></div>
+            <div class="fp-field"><label class="fp-label">Job Name</label><input class="fp-input" id="f-job" type="text" placeholder="Kitchen Renovation"></div>
+            <div class="fp-field"><label class="fp-label">Client Name</label><input class="fp-input" id="f-client" type="text" placeholder="John Smith"></div>
+            <div class="fp-field"><label class="fp-label">Date</label><input class="fp-input" id="f-date" type="text" readonly></div>
+
+            <h2>Materials</h2>
+            <div id="mat-rows"></div>
+            <button class="add-mat-btn" id="add-mat-btn">+ Add Material</button>
+
+            <h2>Notes / Special Instructions</h2>
+            <textarea class="fp-textarea" id="f-notes" placeholder="Delivery notes, site conditions, special requests…"></textarea>
+
+            <h2>Edge Profile Legend</h2>
+            <div id="live-legend"><span class="ll-empty">No edge profiles assigned yet.</span></div>
+
+            <h2>Piece Summary</h2>
+            <div id="piece-summary"><span class="ll-empty">No pieces on canvas.</span></div>
+
+            <h2>Actions</h2>
+            <div class="act-btns">
+                <button class="act-btn act-primary" id="btn-save-quote">💾 Save Quote</button>
+                <button class="act-btn" id="btn-load-quote">📂 Load Quote</button>
+                <button class="act-btn" id="btn-export-pdf">📄 Export PDF (Internal)</button>
+                <button class="act-btn" id="btn-print-quote">🖨️ Print Quote</button>
+                <button class="act-btn act-danger" id="btn-new-quote">🆕 New Quote</button>
+            </div>
+            <input type="file" id="load-file-input" accept=".json" style="display:none">
+
+        </div><!-- end #layout-panel -->
+
+        <!-- ── Pricing panel ── -->
+        <div id="pricing-panel" style="display:none">
+
+            <h2>Fabricator Costs</h2>
+            <p class="price-internal-note">Internal only — not visible to client. Materials pulled from Layout tab.</p>
+            <div id="cost-item-rows"></div>
+
+            <h2 style="margin-top:12px">Installation &amp; Extras — Per Room</h2>
+            <p class="price-internal-note">Install cost and extras are blended into each material's price — not visible to client.</p>
+            <div id="room-pricing-rows"></div>
+
+            <h2 style="margin-top:12px">Commission</h2>
+            <p class="price-internal-note">Blended into material prices — not visible to client. Max $500.</p>
+            <div class="room-install-row">
+                <label class="mat-lbl">Commission $</label>
+                <input class="mat-input" type="number" id="commission-input" min="0" max="500" step="0.01" placeholder="0.00">
+            </div>
+
+            <div class="act-btns" style="margin-top:14px">
+                <button class="act-btn act-primary" id="btn-gen-proposal">📋 Generate Proposal</button>
+            </div>
+
+        </div><!-- end #pricing-panel -->
+
+    </div>
+</div>
+
+<div class="status-bar">
+    <span id="st-tool">Tool: <b>Draw</b></span>
+    <span id="st-pieces">Pieces: <b>0</b></span>
+    <span id="st-pos">Cursor: <b>—</b></span>
+    <span id="st-hint">R=Draw &nbsp;S=Select &nbsp;Ctrl+Z=Undo &nbsp;Del=Delete &nbsp;Dbl-click=Edit</span>
+</div>
+
+<!-- ── Popups ── -->
+<div id="size-popup" class="popup-box">
+    <h3 id="pop-title">Set Dimensions</h3>
+    <div class="pop-row"><label>Width <span>(inches)</span></label><input id="pop-w" type="number" min="1" max="240" step="0.5" placeholder="e.g. 36"></div>
+    <div class="pop-row"><label>Height <span>(inches)</span></label><input id="pop-h" type="number" min="1" max="180" step="0.5" placeholder="e.g. 25.5"></div>
+    <div class="pop-hint">Inches only &nbsp;|&nbsp; Enter=confirm &nbsp;Esc=cancel</div>
+    <div class="pop-btns"><button class="pop-ok" id="pop-ok">Add Piece</button><button class="pop-cancel" id="pop-cancel">Cancel</button></div>
+</div>
+
+<div id="lshape-popup" class="popup-box" style="min-width:290px">
+    <h3 id="lshape-title">L-Shape Dimensions</h3>
+    <canvas id="lshape-diagram" width="200" height="130" style="display:block;margin:0 auto 8px;background:#141806;border-radius:3px;border:1px solid #2c3812;"></canvas>
+    <div class="toggle-row">
+        <button class="tog-btn active" id="lshape-ne" title="Notch top-right">┘ NE</button>
+        <button class="tog-btn"        id="lshape-nw" title="Notch top-left">└ NW</button>
+        <button class="tog-btn"        id="lshape-se" title="Notch bottom-right">┐ SE</button>
+        <button class="tog-btn"        id="lshape-sw" title="Notch bottom-left">┌ SW</button>
+    </div>
+    <div class="ls-fields">
+        <div class="ls-field"><span class="ls-lbl" id="lbl-A">A</span><input class="ls-inp" id="ls-A" type="number" min="0.5" max="480" step="0.5"><span class="ls-unit">"</span></div>
+        <div class="ls-field"><span class="ls-lbl" id="lbl-B">B</span><input class="ls-inp" id="ls-B" type="number" min="0.5" max="360" step="0.5"><span class="ls-unit">"</span></div>
+        <div class="ls-field"><span class="ls-lbl" id="lbl-C">C</span><input class="ls-inp" id="ls-C" type="number" min="0.5" max="480" step="0.5"><span class="ls-unit">"</span></div>
+        <div class="ls-field"><span class="ls-lbl" id="lbl-D">D</span><input class="ls-inp" id="ls-D" type="number" min="0.5" max="360" step="0.5"><span class="ls-unit">"</span></div>
+        <div class="ls-field"><span class="ls-lbl" id="lbl-E">E</span><input class="ls-inp" id="ls-E" type="number" min="0.5" max="480" step="0.5"><span class="ls-unit">"</span></div>
+        <div class="ls-field"><span class="ls-lbl" id="lbl-F">F</span><input class="ls-inp" id="ls-F" type="number" min="0.5" max="360" step="0.5"><span class="ls-unit">"</span></div>
+    </div>
+    <div class="pop-hint" id="lshape-hint">Shaded = auto-computed &nbsp;|&nbsp; inches only</div>
+    <div class="pop-btns"><button class="pop-ok" id="lshape-ok">Add Piece</button><button class="pop-cancel" id="lshape-cancel">Cancel</button></div>
+</div>
+
+<div id="text-popup" class="popup-box" style="min-width:220px">
+    <h3>Add Text</h3>
+    <div class="pop-row"><label>Text</label><input id="text-content" type="text" placeholder="Label / note..." style="width:150px"></div>
+    <div class="pop-row"><label>Size <span>(pt)</span></label><input id="text-size" type="number" min="6" max="72" step="1" value="12"></div>
+    <div class="pop-btns"><button class="pop-ok" id="text-ok">Place</button><button class="pop-cancel" id="text-cancel">Cancel</button></div>
+</div>
+
+<div id="sink-popup" class="popup-box">
+    <h3>Add Sink</h3>
+    <div class="toggle-row"><button class="tog-btn active" id="sink-btn-over">Overmount</button><button class="tog-btn" id="sink-btn-under">Undermount</button></div>
+    <div class="pop-row"><label>Width <span>(inches)</span></label><input id="sink-w" type="number" min="1" max="240" step="0.5" value="24"></div>
+    <div class="pop-row"><label>Depth <span>(inches)</span></label><input id="sink-h" type="number" min="1" max="180" step="0.5" value="15"></div>
+    <div class="pop-btns"><button class="pop-ok" id="sink-ok">Place Sink</button><button class="pop-cancel" id="sink-cancel">Cancel</button></div>
+</div>
+
+<div id="radius-popup" class="popup-box">
+    <h3>Corner Radius</h3>
+    <div class="pop-row"><label>Corner</label><span id="radius-corner-lbl" style="color:#b09030;font-weight:700;font-size:13px">—</span></div>
+    <div class="pop-row"><label>Radius <span>(inches)</span></label><input id="radius-val" type="number" min="0" max="24" step="0.25" value="0"></div>
+    <div class="pop-hint">0 = no rounding</div>
+    <div class="pop-btns"><button class="pop-ok" id="radius-ok">Set Radius</button><button class="pop-cancel" id="radius-cancel">Cancel</button></div>
+</div>
+
+<div id="edge-popup" class="popup-box">
+    <h3>Edge Profile</h3>
+    <div class="pop-row"><label>Edge</label><span id="edge-which-lbl" style="color:#b09030;font-weight:700;font-size:13px">—</span></div>
+    <div class="pop-row">
+        <label>Profile</label>
+        <select id="edge-type-sel">
+            <option value="none">None / Default</option>
+            <option value="polished">Polished Edge (POL)</option>
+            <option value="mitered">Mitered Edge (MT)</option>
+            <option value="special">Special Finish (SF)</option>
+            <option value="joint">Joint Edge (JT)</option>
+            <option value="waterfall">Waterfall Edge (WF)</option>
+        </select>
+    </div>
+    <div class="pop-btns"><button class="pop-ok" id="edge-ok">Set Profile</button><button class="pop-cancel" id="edge-cancel">Cancel</button></div>
+</div>
+
+<div id="bsp-popup" class="popup-box" style="min-width:290px">
+    <h3 id="bsp-title">Backsplash Dimensions</h3>
+    <canvas id="bsp-diagram" width="200" height="130" style="display:block;margin:0 auto 8px;background:#141806;border-radius:3px;border:1px solid #2c3812;"></canvas>
+    <div class="ls-fields">
+        <div class="ls-field"><span class="ls-lbl">W</span><input class="ls-inp" id="bsp-W" type="number" min="1" max="480" step="0.5" value="96"><span class="ls-unit">"</span></div>
+        <div class="ls-field"><span class="ls-lbl">Hb</span><input class="ls-inp" id="bsp-Hb" type="number" min="1" max="240" step="0.5" value="4"><span class="ls-unit">"</span></div>
+        <div class="ls-field"><span class="ls-lbl">Hp</span><input class="ls-inp" id="bsp-Hp" type="number" min="1" max="240" step="0.5" value="18"><span class="ls-unit">"</span></div>
+        <div class="ls-field"><span class="ls-lbl">Wp</span><input class="ls-inp" id="bsp-Wp" type="number" min="1" max="480" step="0.5" value="36"><span class="ls-unit">"</span></div>
+        <div class="ls-field"><span class="ls-lbl">Xl</span><input class="ls-inp" id="bsp-Xl" type="number" min="0" max="480" step="0.5" value="30"><span class="ls-unit">"</span></div>
+    </div>
+    <div class="pop-hint">W=Total Width · Hb=Base Height · Hp=Step Height · Wp=Step Width · Xl=Step Left Offset</div>
+    <div class="pop-btns"><button class="pop-ok" id="bsp-ok">Add Piece</button><button class="pop-cancel" id="bsp-cancel">Cancel</button></div>
+</div>
+
+<div id="joint-popup" class="popup-box">
+    <h3>Add Joint Line</h3>
+    <div class="toggle-row"><button class="tog-btn active" id="joint-btn-v">↕ Vertical</button><button class="tog-btn" id="joint-btn-h">↔ Horizontal</button></div>
+    <div class="pop-hint">Drag to reposition &nbsp;|&nbsp; Dbl-click line to remove &nbsp;|&nbsp; Del to delete selected joint</div>
+    <div class="pop-btns"><button class="pop-ok" id="joint-ok">Add Joint</button><button class="pop-cancel" id="joint-cancel">Cancel</button></div>
+</div>
+
+<script>
+'use strict';
+// ─── Brand logo (embedded) ───────────────────────────────────
+const LOGO_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHcAAACDCAYAAAC3OoSFAAAK20lEQVR4nO2d6XsTxx3HZ2TrviXLkqzLYIMhKWlfFULIURLScpSQs39jE5L0KSTtk3CFtIG8a+IkLdgG40sWlqxjdR/ePuPYfnxIu7OrnZldeT7PwwvAlkb71W+O3zVQFEUwCKDPUW80QLlSBuuLt4l+KHfkdehyOoHT4QBDQ0NAr0Cjiluv10G2kAeV1fu6+QDesTeg3W4HNosVWCwWACFkOh7DiNtoNoFQFkBu4ZYxBryFP3Eeup1uYLNaqYutW3HRuJqtFpj/5XN9DlAl/vh56PN6gXnYTFxs3Ynb6XTA7PR1fQ2KIPbQKzAWiRJZu3UjbrlSAcszN/UxGAaEUheg3+fX1JqZi1sUSmB17h+HVtTdTJ76AGppwcOAESWhBNJcVKJQF7daq4LFRze4qPs4+uJ7mlotVXHR9P/4h4+5qF1InLgKzWYz0Boq4uby6yD77GsubBeiExehw2YHJCAqbrvTBnPTn3JRexCZuAg9bg8gBTFxhXIZrMx+wYXtgT/xJvQSFJaYuI/+81cuqgxBnx+QRlNx2+02mPuJT8NyxI5d0XxnTFRcbq14jE1e2gwX0qBvcfkRR1lI0OV0AVqY+n0BLiw+o6EQ1bBfX+Jmc1ntRjLgJKauQhPs25YUofrdUKw1RzidZZCOPQ47GUcFEXGf/vwZFxYTv8cLWKBKXL4zxscZPkfEb0xEXC6sMiqZf4m1eh2wQFGwfiWzCoT0N1zcPokduwydDqd+cqhQTvCz//6NC6shqZPvQJvVBphOyxsbG1xYAgiCAEiCJe7Mj59wYQmwAUS24rZaLaIDOMw47A624j7h51nDiisZOGCd9mokzCMvw6PxJHYYNHniHThkIuuOlHx1HhTAp5V9IKJ03f0MDw8Di+/0njPPxKn3od1GbpeMdRTiDou94TpoMoHC0h1RLuEN5UXtfnapk9dgrV4DTrsDIG8VrchQz2mZC3twffS43aCwBCRBifbpff/WbreA3+sDtKEbgzIw9q1p1Bp8Gept46RI3OXV/d89ztBWzlNiLKb4d5GfoNt6zETcso6q1fVCoVTcPD2oTWxbz+epnz5M3VyNnIOszX8losr+7ZpaoBCvx0O9sv6AuNzVKL1ZqtSqIBmLAyVEJi5t1t7ShlkJp1FZenRD9Mf+AKWOQXphj+U2m012IzEQ+eW7Yi/L3l6bdSduvlhgN5IBIfPkn2KpLOhC4D3iFnp8IznKQG0gqrUaYA13YhBi6fENEfX7YGnBO+LyIxAZC0ZLHSuBd8RllaF3GM7H+SJ9B8YecYsl+u6xw8La/Nfi8+waOw+VsMpTVkmCNqsrmTTV5Y9vqChSXv1WrDXoLX9cXMrQjA5xcSnDLXeAaeW+F2ltrLi4DKC1qeLiMoBb7gADCecrb8PFZQCt0CoXlwEFSqFVLi4DSulvRFRmQhouLiPK1Qrx9+DiMszYIH0k4uIyhHSYlYvLkKJQJPr6XFyGCOn7RF2RXFyG2EbOQpK+qh1xLb7fs70y8hBSz34nzvzwsUiq78iOuKlkisgbcNgdi3bEZX3X62GmUCoRiRRxcXVAM/dAzOZzmkeL+IZKJ+QX72juktwjrjV4hpsvQ3Iov1nDrnJ7xA2Hwpq9MEc5xaW7YrPZIiMuuledwxZUX0REXL6pInvxsSf6huwDzi/eFhsaBfP5hooCky/9eqN1NBwGvpi8wAWNrPeAuFO/+ws3X60vPTYNKdrXFDSyXm65hDuhd7u84thLH2JYb/8RIy4uIVBX1l4t7k0mE3BGXpMUuLB4p2/r7Spu5OhFPjX3Qez4FdmurPFIVPZ1UPMUzcVFDbE46hgdfxu6HHi3bIaO/FHaepf6s14+LWsI6k/lU9CdNYDxs+v5ddXj4eJqxEjqAhwNjSr2FQSTb0FSabA9xXWOnuPrLib28DkYUNn+L+gPELPenuLGomOqXvAwEvD6VHv30O/JbWBRx7pmq6mduNwVic/y45sianOvFpxrzvMF5SUo/I4DDUGtemORKHZPZqFSBiszX2A/4yMvvAstFos24jYaDTBvwGvexl94F1q3HgJqEZSXuXSCBOEjf9r0TmVya6CVeyiaA6c3nRpetxtkC3lQf/5vxWNC8fZkPAlMmLOq7EWNRrJee+gsTIzFDywpJaG02VEVDACJqT9D3DsTBuooFB2NdN0reHTUA7lf1hWUf8qKG0xIn8P244udZ7ITC6YuSN4wPTUg0a4K6mWFWWMkK+5IMKjozdsb5OtOu+HAuGFrakAExo0YaT4tl9P3RTV37/RLu9PB+rnjv/3I8AKXlu9h1RgRWXOVXvCgBenZL7E+MIRwM+UFGABb6GzPcWombmLqKlTsdZmgHzasY3ZnG1J5NxBt6mvfiWb/3kseEZbgGYjjZMIS12G3KxoU+k553R4QGn+bqsAL//u72O6wWfNJMRI46HsOBYJYHkQi0/L2lIGc6SiHCFBkbvpTrChK6uQ1Q0zNqNM6utJm97hdThfW72KLOyoTWN6NuKuoCR1PaO9S0WXEbRkLNkqOdj37QERiomeI/igZt0lL5/Y2G10We+oCTyOB8XbQeqeqMiiBLa55uLeDYD+9yhHpC3xd7EiURvoTbBwuSsnmsqoqABWtubjnVz3ddLK4vNhzPKPBEDACjdxDsbPRIStuKp7A+rkNiYHg5Oxq/WDyBTa3g2hJrVYnKy5uAF9qrUM5u7TJLtwSe52BUe4TMADZdeVTM5EnLTctJ08oc4podQbudPnS4eQw6YHm+vdiS2GinGJxQyl5x0S3h7gbu02ZU0QrypVy1393R183hPVWq1Wy4gb8flVHIT2w2qPf4lg4AoxA5qmyfpFEpmU9J9fVDH6tXb3RYCuuzWLVbWy1tHXvvFFBSXVExUVZeFL/b7fLB85ZUVq5R6xjGw1Q/ZDcnqYvcaXSK52hVyCuN2ts8jIT6y0r3JjojQpmxzmTlrtORFBBWo4Sf7WWdLoEFSZ+875+Nwoqp2ZV4i5LJFJbMdbb3RsvpYkAWuDokho6PDzMZCxqL3zEKS8xaV10rNQDpTQRoF/MgdM9C6PRWMYmLxlC4JIg0BM3NnkZu+iYZdJ7SCaLwe1yG8KCcwu3ZHPGNBF34tQH0OXCyw7YTbaPwmI1+BNvQiSeHMiCjZAGW63V+isnIQltq5089Ws/KCUUisVNzxDQaeGZVKYpM3HRWfPJz5+JtGqI4tFYXxGpVrsFnvxEZ7xKQLt8tBnUVa1QLp+n8j6xY1dgMpboO9SIzu5oqtbbkUmq4w0Ty0Ueltnp60Tf2Bl+FaKAAKn4MfoMKAkgt3ibuTWjBIhun5O6uCiqMfPjJ0TfdPzkNWilmN2IPEZLj28yEzl+/Ap0djmpUBd3NZMBxfQ9kfb6Q4vM2nNQWL5L9aFaAmfgeCJ54IhHXVwSO2SU+C5VvskClBiP8qdpvV+3lgrUxRXKAliZ/VIcBCtV4k1Kz/X/meW60e1vWkb96eA4EbqB6o58Xi8wQeM1A/C43cCz5RR5uvgMNHMPNRd6d5WHLpwYaHO1sLwEGrkHO4NAPZncLheTLEmjbSxd4VdhOfPt5mscefE9aNm3NDEVl9OfQwed4aXCplxcHYE6tM7/8jm2IO7Ia3BMorUvF1eHIE1Q15rs/FciThuIXlEuLq7B12apYAgX10Cg/pKocmL77xb/aZiMJ3q2geDiDjCDfd445HBxBxguLhhc/g8R75CpOt5gPgAAAABJRU5ErkJggg==';
+// ─────────────────────────────────────────────────────────────
+//  Constants
+// ─────────────────────────────────────────────────────────────
+const FOOT          = 48;
+const INCH          = 4;
+const SNAP_PX       = 4;
+const CW            = 960;
+const CH            = 720;
+const RULER_SZ      = 28;
+const HND           = 7;
+const MAX_UNDO      = 20;
+const CORNER_THRESH = 18;
+const EDGE_THRESH   = 11;
+const JOINT_THRESH  = 6;
+
+const EDGE_DEFS = {
+    none:      { abbr: null,  label: 'None',           color: '#888'    },
+    polished:  { abbr: 'POL', label: 'Polished Edge',  color: '#dd0000' },
+    mitered:   { abbr: 'MT',  label: 'Mitered Edge',   color: '#7a3000' },
+    special:   { abbr: 'SF',  label: 'Special Finish', color: '#228B22' },
+    joint:     { abbr: 'JT',  label: 'Joint Edge',     color: '#e0457b' },
+    waterfall: { abbr: 'WF',  label: 'Waterfall Edge', color: '#006688' },
+};
+
+// ─────────────────────────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────────────────────────
+// ─── Pages ───────────────────────────────────────────────────
+let pages = [{ id:1, name:'Page 1', shapes:[], textItems:[], nextId:1, _undo:[] }];
+let currentPageIdx = 0;
+
+let shapes    = [];
+let nextId    = 1;
+let tool      = 'draw';
+let selected  = null;
+let undoStack = [];
+let textItems = [];       // { id, x, y, text, size }
+let selectedText = null;  // id of selected text item
+let movingText = false;
+let moveTextStart = null; // { mx, my, ox, oy }
+
+let drawing = false, dStart = null, dCur = null;
+let pendingPlace = null;
+
+let moving = false, moveOff = null;
+let resizing = false, resizeH = null, resizeBase = null, resizeMouse = null;
+
+let currentPopup      = null;
+let editingId         = null;
+let sinkMountType     = 'overmount';
+let pendingCorner     = null;
+let pendingEdge       = null;
+let pendingJointShape = null;
+let pendingJointPos   = null;
+let jointOrientation  = 'v';
+
+let hovCorner     = null;
+let hovEdge       = null;
+let hovCornerEdge = null;  // { s, key, px, py } for corner arc hover in edge mode
+let activeEdgeType = 'polished';
+let selectedJoint = null;    // { s, j }
+let draggingJoint = false;
+let draggingJointRef = null; // { s, j }
+
+// ─────────────────────────────────────────────────────────────
+//  Canvas refs
+// ─────────────────────────────────────────────────────────────
+const cv   = document.getElementById('mainCanvas');
+const ctx  = cv.getContext('2d');
+const rH   = document.getElementById('rulerH');   const ctxH = rH.getContext('2d');
+const rV   = document.getElementById('rulerV');   const ctxV = rV.getContext('2d');
+const rC   = document.getElementById('rulerCorner'); const ctxC = rC.getContext('2d');
+
+// ─────────────────────────────────────────────────────────────
+//  Utils
+// ─────────────────────────────────────────────────────────────
+const snap  = v => Math.round(v / SNAP_PX) * SNAP_PX;
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const byId  = id => shapes.find(s => s.id === id);
+
+function pxToIn(px) {
+    const v = px / INCH;
+    return v % 1 === 0 ? v.toFixed(0) : parseFloat(v.toFixed(2)).toString();
+}
+
+function mousePos(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+function normRect(x, y, w, h) {
+    return { x: w < 0 ? x+w : x, y: h < 0 ? y+h : y, w: Math.abs(w), h: Math.abs(h) };
+}
+
+function normalizeShape(s) {
+    const base = {
+        ...s,
+        shapeType: s.shapeType || 'rect',
+        subtype:   s.subtype   || null,
+        corners:   s.corners   || { nw:0, ne:0, se:0, sw:0 },
+        joints:    (s.joints   || []).map(j => ({ ...j })),
+        cornerEdges: s.cornerEdges || {nw:{type:'none'},ne:{type:'none'},se:{type:'none'},sw:{type:'none'}},
+    };
+    if (base.shapeType === 'l') {
+        base.notchW      = s.notchW      || 0;
+        base.notchH      = s.notchH      || 0;
+        base.notchCorner = s.notchCorner || 'ne';
+        base.edges = s.edges || { seg0:{type:'none'}, seg1:{type:'none'}, seg2:{type:'none'}, seg3:{type:'none'}, seg4:{type:'none'}, seg5:{type:'none'} };
+    } else if (base.shapeType === 'bsp') {
+        base.edges = s.edges || { seg0:{type:'none'}, seg1:{type:'none'}, seg2:{type:'none'}, seg3:{type:'none'}, seg4:{type:'none'}, seg5:{type:'none'}, seg6:{type:'none'}, seg7:{type:'none'} };
+    } else {
+        base.edges = s.edges || { top:{type:'none'}, right:{type:'none'}, bottom:{type:'none'}, left:{type:'none'} };
+    }
+    return base;
+}
+
+function shapeRadii(s) {
+    const c = s.corners || { nw:0, ne:0, se:0, sw:0 };
+    const mx = Math.min(s.w, s.h) / 2;
+    return { nw: Math.min(c.nw||0, mx), ne: Math.min(c.ne||0, mx), se: Math.min(c.se||0, mx), sw: Math.min(c.sw||0, mx) };
+}
+
+// ─────────────────────────────────────────────────────────────
+//  L-Shape helpers
+// ─────────────────────────────────────────────────────────────
+function lShapePolygon(s) {
+    const { x, y, w, h } = s;
+    const nW = s.notchW || 0, nH = s.notchH || 0;
+    switch (s.notchCorner || 'ne') {
+        case 'ne': return [[x,y],[x+w-nW,y],[x+w-nW,y+nH],[x+w,y+nH],[x+w,y+h],[x,y+h]];
+        case 'nw': return [[x+nW,y],[x+w,y],[x+w,y+h],[x,y+h],[x,y+nH],[x+nW,y+nH]];
+        case 'se': return [[x,y],[x+w,y],[x+w,y+h-nH],[x+w-nW,y+h-nH],[x+w-nW,y+h],[x,y+h]];
+        case 'sw': return [[x,y],[x+w,y],[x+w,y+h],[x+nW,y+h],[x+nW,y+h-nH],[x,y+h-nH]];
+    }
+}
+const L_SIDE_LABELS = {
+    ne: ['Top','Inner Vert.','Inner Horiz.','Right','Bottom','Left'],
+    nw: ['Top','Right','Bottom','Left','Inner Horiz.','Inner Vert.'],
+    se: ['Top','Right','Inner Horiz.','Inner Vert.','Bottom','Left'],
+    sw: ['Top','Right','Bottom','Inner Vert.','Inner Horiz.','Left'],
+};
+function lShapeSides(s) {
+    const pts = lShapePolygon(s);
+    const labels = L_SIDE_LABELS[s.notchCorner || 'ne'];
+    return pts.map((p, i) => {
+        const j = (i+1) % 6;
+        return { key:`seg${i}`, label:labels[i], x1:p[0], y1:p[1], x2:pts[j][0], y2:pts[j][1] };
+    });
+}
+// ─────────────────────────────────────────────────────────────
+//  BSP (Backsplash T-shape) helpers
+// ─────────────────────────────────────────────────────────────
+function bspPolygon(s) {
+    const px = s.pX !== undefined ? s.pX : Math.round((s.w - s.pW) / 2);
+    return [
+        [s.x + px,           s.y        ],   // 0: top-left of protrusion
+        [s.x + px + s.pW,    s.y        ],   // 1: top-right of protrusion
+        [s.x + px + s.pW,    s.y + s.pH ],   // 2: inner-right
+        [s.x + s.w,          s.y + s.pH ],   // 3: far-right at step line
+        [s.x + s.w,          s.y + s.h  ],   // 4: bottom-right
+        [s.x,                s.y + s.h  ],   // 5: bottom-left
+        [s.x,                s.y + s.pH ],   // 6: far-left at step line
+        [s.x + px,           s.y + s.pH ],   // 7: inner-left
+    ];
+}
+function bspSides(s) {
+    const pts = bspPolygon(s);
+    return pts.map((p, i) => {
+        const j=(i+1)%8;
+        return { key:`seg${i}`, x1:p[0], y1:p[1], x2:pts[j][0], y2:pts[j][1] };
+    });
+}
+
+function polygonCentroid(pts) {
+    let area=0, cx=0, cy=0;
+    for (let i=0,n=pts.length; i<n; i++) {
+        const j=(i+1)%n, c=pts[i][0]*pts[j][1]-pts[j][0]*pts[i][1];
+        area+=c; cx+=(pts[i][0]+pts[j][0])*c; cy+=(pts[i][1]+pts[j][1])*c;
+    }
+    area/=2; return { x:cx/(6*area), y:cy/(6*area) };
+}
+function pointInPolygon(px, py, pts) {
+    let inside=false;
+    for (let i=0,j=pts.length-1; i<pts.length; j=i++) {
+        const xi=pts[i][0],yi=pts[i][1],xj=pts[j][0],yj=pts[j][1];
+        if (((yi>py)!==(yj>py))&&(px<(xj-xi)*(py-yi)/(yj-yi)+xi)) inside=!inside;
+    }
+    return inside;
+}
+function distToSegment(px, py, x1, y1, x2, y2) {
+    const dx=x2-x1, dy=y2-y1, len2=dx*dx+dy*dy;
+    if (!len2) return Math.hypot(px-x1, py-y1);
+    const t=Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/len2));
+    return Math.hypot(px-(x1+t*dx), py-(y1+t*dy));
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Undo / Persist
+// ─────────────────────────────────────────────────────────────
+// ── sync active page vars ↔ pages[] ──────────────────────────
+function syncPageOut() {
+    const p = pages[currentPageIdx];
+    p.shapes    = shapes.map(s => JSON.parse(JSON.stringify(s)));
+    p.textItems = textItems.map(t => ({...t}));
+    p.nextId    = nextId;
+    p._undo     = undoStack.slice();
+}
+function syncPageIn() {
+    const p = pages[currentPageIdx];
+    shapes    = (p.shapes||[]).map(normalizeShape);
+    textItems = (p.textItems||[]).map(t => ({...t}));
+    nextId    = p.nextId||1;
+    undoStack = (p._undo||[]).slice();
+}
+
+function pushUndo() {
+    undoStack.push(JSON.stringify({ shapes, nextId, textItems }));
+    if (undoStack.length > MAX_UNDO) undoStack.shift();
+}
+function undo() {
+    if (!undoStack.length) return;
+    const st = JSON.parse(undoStack.pop());
+    shapes = st.shapes.map(normalizeShape); nextId = st.nextId; textItems = st.textItems||[];
+    selected = null; selectedJoint = null; selectedText = null;
+    persist(); render(); updateStatus();
+}
+function persist() {
+    syncPageOut();
+    // Save pages without _undo (transient)
+    const save = pages.map(p => ({ id:p.id, name:p.name, shapes:p.shapes, textItems:p.textItems, nextId:p.nextId }));
+    localStorage.setItem('spartan_v4', JSON.stringify({ pages: save, currentPageIdx }));
+}
+function load() {
+    try {
+        // v4: multi-page format
+        const v4raw = localStorage.getItem('spartan_v4');
+        if (v4raw) {
+            const d = JSON.parse(v4raw);
+            pages = (d.pages||[]).map(p => ({ id:p.id||1, name:p.name||'Page 1', shapes:(p.shapes||[]).map(normalizeShape), textItems:p.textItems||[], nextId:p.nextId||1, _undo:[] }));
+            if (!pages.length) pages = [{ id:1, name:'Page 1', shapes:[], textItems:[], nextId:1, _undo:[] }];
+            currentPageIdx = Math.max(0, Math.min(d.currentPageIdx||0, pages.length-1));
+            syncPageIn();
+            return;
+        }
+        // v3/v2: single-page legacy
+        const d = JSON.parse(localStorage.getItem('spartan_v3') || localStorage.getItem('spartan_v2') || 'null');
+        if (d) {
+            pages[0].shapes    = (d.shapes||[]).map(normalizeShape);
+            pages[0].textItems = d.textItems||[];
+            pages[0].nextId    = d.nextId||1;
+        }
+        syncPageIn();
+    } catch(e) { syncPageIn(); }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Hit testing
+// ─────────────────────────────────────────────────────────────
+function handles(s) {
+    if (s.shapeType === 'l') return [];
+    const { x, y, w, h } = s;
+    return [
+        { id:'nw', px:x,     py:y,     cur:'nw-resize' }, { id:'n',  px:x+w/2, py:y,     cur:'n-resize'  },
+        { id:'ne', px:x+w,   py:y,     cur:'ne-resize' }, { id:'e',  px:x+w,   py:y+h/2, cur:'e-resize'  },
+        { id:'se', px:x+w,   py:y+h,   cur:'se-resize' }, { id:'s',  px:x+w/2, py:y+h,   cur:'s-resize'  },
+        { id:'sw', px:x,     py:y+h,   cur:'sw-resize' }, { id:'w',  px:x,     py:y+h/2, cur:'w-resize'  },
+    ];
+}
+function hitHandle(s, mx, my) {
+    const R = Math.floor(HND/2) + 2;
+    return handles(s).find(h => Math.abs(mx-h.px) <= R && Math.abs(my-h.py) <= R) || null;
+}
+function hitShape(mx, my) {
+    for (let i = shapes.length-1; i >= 0; i--) {
+        const s = shapes[i];
+        if (s.shapeType === 'l') {
+            if (pointInPolygon(mx, my, lShapePolygon(s))) return s;
+        } else if (s.shapeType === 'bsp') {
+            if (pointInPolygon(mx, my, bspPolygon(s))) return s;
+        } else {
+            if (mx >= s.x && mx <= s.x+s.w && my >= s.y && my <= s.y+s.h) return s;
+        }
+    }
+    return null;
+}
+function nearestCorner(mx, my) {
+    let best = null, bestD = CORNER_THRESH;
+    for (const s of shapes) {
+        if (s.shapeType === 'l') continue; // L-shapes don't support corner radius
+        for (const [key, px, py] of [['nw',s.x,s.y],['ne',s.x+s.w,s.y],['se',s.x+s.w,s.y+s.h],['sw',s.x,s.y+s.h]]) {
+            const d = Math.hypot(mx-px, my-py);
+            if (d < bestD) { bestD = d; best = { s, key, px, py }; }
+        }
+    }
+    return best;
+}
+function nearestEdge(mx, my) {
+    let best = null, bestD = EDGE_THRESH;
+    for (const s of shapes) {
+        if (s.shapeType === 'l') {
+            const sides = lShapeSides(s);
+            for (const sd of sides) {
+                const d = distToSegment(mx, my, sd.x1, sd.y1, sd.x2, sd.y2);
+                if (d < bestD) { bestD = d; best = { s, key:sd.key, label:sd.label, x1:sd.x1, y1:sd.y1, x2:sd.x2, y2:sd.y2 }; }
+            }
+        } else if (s.shapeType === 'bsp') {
+            const sides = bspSides(s);
+            for (const sd of sides) {
+                const d = distToSegment(mx, my, sd.x1, sd.y1, sd.x2, sd.y2);
+                if (d < bestD) { bestD = d; best = { s, key:sd.key, label:sd.key, x1:sd.x1, y1:sd.y1, x2:sd.x2, y2:sd.y2 }; }
+            }
+        } else {
+            const r = shapeRadii(s);
+            const cands = [
+                { key:'top',    x1:s.x,       y1:s.y,       x2:s.x+s.w,   y2:s.y,       d:Math.abs(my-s.y)        },
+                { key:'bottom', x1:s.x+s.w,   y1:s.y+s.h,   x2:s.x,       y2:s.y+s.h,   d:Math.abs(my-(s.y+s.h))  },
+                { key:'left',   x1:s.x,       y1:s.y+s.h,   x2:s.x,       y2:s.y,       d:Math.abs(mx-s.x)        },
+                { key:'right',  x1:s.x+s.w,   y1:s.y,       x2:s.x+s.w,   y2:s.y+s.h,   d:Math.abs(mx-(s.x+s.w))  },
+            ];
+            for (const c of cands) {
+                if (c.key === 'top' || c.key === 'bottom') {
+                    if (mx < s.x-EDGE_THRESH || mx > s.x+s.w+EDGE_THRESH) continue;
+                } else {
+                    if (my < s.y-EDGE_THRESH || my > s.y+s.h+EDGE_THRESH) continue;
+                }
+                if (c.d < bestD) { bestD = c.d; best = { s, key:c.key, label:c.key, x1:c.x1, y1:c.y1, x2:c.x2, y2:c.y2 }; }
+            }
+        }
+    }
+    return best;
+}
+function nearestCornerForEdge(mx, my) {
+    const THRESH = 18;
+    for (const s of shapes) {
+        if (s.shapeType === 'l' || s.shapeType === 'bsp') continue;
+        const r = shapeRadii(s);
+        const corners = [
+            { key:'nw', cx:s.x+r.nw,     cy:s.y+r.nw,     startA:Math.PI,       endA:1.5*Math.PI, r:r.nw },
+            { key:'ne', cx:s.x+s.w-r.ne, cy:s.y+r.ne,     startA:1.5*Math.PI,   endA:2*Math.PI,   r:r.ne },
+            { key:'se', cx:s.x+s.w-r.se, cy:s.y+s.h-r.se, startA:0,             endA:0.5*Math.PI, r:r.se },
+            { key:'sw', cx:s.x+r.sw,     cy:s.y+s.h-r.sw, startA:0.5*Math.PI,   endA:Math.PI,     r:r.sw },
+        ];
+        for (const c of corners) {
+            if (c.r <= 0) continue;
+            const midA = (c.startA + c.endA) / 2;
+            const mpx = c.cx + Math.cos(midA) * c.r;
+            const mpy = c.cy + Math.sin(midA) * c.r;
+            if (Math.hypot(mx - mpx, my - mpy) < THRESH) return { s, key: c.key, px: mpx, py: mpy };
+        }
+    }
+    return null;
+}
+
+function hitJoint(mx, my) {
+    for (const s of shapes) {
+        for (const j of (s.joints || [])) {
+            if (j.axis === 'v') {
+                const jx = s.x + j.pos;
+                if (Math.abs(mx-jx) < JOINT_THRESH && my >= s.y-2 && my <= s.y+s.h+2) return { s, j };
+            } else {
+                const jy = s.y + j.pos;
+                if (Math.abs(my-jy) < JOINT_THRESH && mx >= s.x-2 && mx <= s.x+s.w+2) return { s, j };
+            }
+        }
+    }
+    return null;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Resize
+// ─────────────────────────────────────────────────────────────
+function applyResize(pos) {
+    const s = byId(selected); if (!s) return;
+    const b = resizeBase;
+    const dx = snap(pos.x - resizeMouse.x), dy = snap(pos.y - resizeMouse.y);
+    let { x, y, w, h } = b;
+    switch (resizeH) {
+        case 'se': w=Math.max(INCH,b.w+dx); h=Math.max(INCH,b.h+dy); break;
+        case 'sw': x=b.x+dx; w=Math.max(INCH,b.w-dx); h=Math.max(INCH,b.h+dy); break;
+        case 'ne': w=Math.max(INCH,b.w+dx); y=b.y+dy; h=Math.max(INCH,b.h-dy); break;
+        case 'nw': x=b.x+dx; y=b.y+dy; w=Math.max(INCH,b.w-dx); h=Math.max(INCH,b.h-dy); break;
+        case 'e':  w=Math.max(INCH,b.w+dx); break;
+        case 'w':  x=b.x+dx; w=Math.max(INCH,b.w-dx); break;
+        case 's':  h=Math.max(INCH,b.h+dy); break;
+        case 'n':  y=b.y+dy; h=Math.max(INCH,b.h-dy); break;
+    }
+    if (x < 0) { w += x; x = 0; } if (y < 0) { h += y; y = 0; }
+    if (x+w > CW) w = CW-x; if (y+h > CH) h = CH-y;
+    w = Math.max(INCH,w); h = Math.max(INCH,h);
+    Object.assign(s, { x, y, w, h });
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Border segment drawing  (ctx passed explicitly for legend)
+// ─────────────────────────────────────────────────────────────
+function drawBorderSegment(gctx, type, x1, y1, x2, y2, sel) {
+    const len = Math.hypot(x2-x1, y2-y1);
+    if (len < 0.5) return;
+    gctx.save();
+    gctx.setLineDash([]);
+
+    if (!type || type === 'none') {
+        gctx.strokeStyle = sel ? '#b09030' : '#222222';
+        gctx.lineWidth = sel ? 2 : 0.8;
+        gctx.beginPath(); gctx.moveTo(x1,y1); gctx.lineTo(x2,y2); gctx.stroke();
+
+    } else if (type === 'polished') {
+        gctx.strokeStyle = '#dd0000'; gctx.lineWidth = 2.5;
+        gctx.beginPath(); gctx.moveTo(x1,y1); gctx.lineTo(x2,y2); gctx.stroke();
+
+    } else if (type === 'mitered') {
+        gctx.strokeStyle = '#7a3000'; gctx.lineWidth = 2;
+        gctx.setLineDash([4,3]);
+        gctx.beginPath(); gctx.moveTo(x1,y1); gctx.lineTo(x2,y2); gctx.stroke();
+
+    } else if (type === 'special') {
+        gctx.strokeStyle = '#228B22'; gctx.lineWidth = 2.5;
+        gctx.beginPath(); gctx.moveTo(x1,y1); gctx.lineTo(x2,y2); gctx.stroke();
+
+    } else if (type === 'joint') {
+        gctx.strokeStyle = '#e0457b'; gctx.lineWidth = 2;
+        gctx.setLineDash([5,4]);
+        gctx.beginPath(); gctx.moveTo(x1,y1); gctx.lineTo(x2,y2); gctx.stroke();
+
+    } else if (type === 'waterfall') {
+        gctx.translate(x1, y1);
+        gctx.rotate(Math.atan2(y2-y1, x2-x1));
+        gctx.strokeStyle = '#006688'; gctx.lineWidth = 1;
+        gctx.beginPath(); gctx.moveTo(0,0); gctx.lineTo(len,0); gctx.stroke();
+        gctx.lineWidth = 1.5;
+        for (let i = 8; i < len; i += 12) {
+            gctx.beginPath(); gctx.moveTo(i-4,-4); gctx.lineTo(i,0); gctx.lineTo(i-4,4); gctx.stroke();
+        }
+    }
+    gctx.restore();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Rounded rect path
+// ─────────────────────────────────────────────────────────────
+function roundedRectPath(gctx, x, y, w, h, r) {
+    gctx.beginPath();
+    gctx.moveTo(x+r.nw, y);
+    gctx.lineTo(x+w-r.ne, y);
+    if (r.ne > 0) gctx.arcTo(x+w, y, x+w, y+r.ne, r.ne); else gctx.lineTo(x+w, y);
+    gctx.lineTo(x+w, y+h-r.se);
+    if (r.se > 0) gctx.arcTo(x+w, y+h, x+w-r.se, y+h, r.se); else gctx.lineTo(x+w, y+h);
+    gctx.lineTo(x+r.sw, y+h);
+    if (r.sw > 0) gctx.arcTo(x, y+h, x, y+h-r.sw, r.sw); else gctx.lineTo(x, y+h);
+    gctx.lineTo(x, y+r.nw);
+    if (r.nw > 0) gctx.arcTo(x, y, x+r.nw, y, r.nw); else gctx.lineTo(x, y);
+    gctx.closePath();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Draw shape
+// ─────────────────────────────────────────────────────────────
+// Draw an arrowhead at (x,y) pointing in direction (tx,ty)
+function drawArrowHead(x, y, tx, ty, size) {
+    const nx = -ty, ny = tx;
+    ctx.beginPath();
+    ctx.moveTo(x + tx*size, y + ty*size);
+    ctx.lineTo(x + nx*(size*0.4), y + ny*(size*0.4));
+    ctx.lineTo(x - nx*(size*0.4), y - ny*(size*0.4));
+    ctx.closePath();
+    ctx.fill();
+}
+
+// Multiplier applied to dim label font size — 1 normally, >1 during proposal PDF render
+let dimSizeMultiplier = 1;
+
+// Draw an engineering dimension line outside a shape edge.
+// (x1,y1)→(x2,y2) must be a CW-wound segment so outward normal = (ty,-tx).
+// lenPx is the raw pixel distance to show as an inch value.
+function drawDimLine(x1, y1, x2, y2, lenPx) {
+    const dx = x2-x1, dy = y2-y1, len = Math.hypot(dx, dy);
+    if (len < INCH) return;                    // skip < 1"
+    const tx = dx/len, ty = dy/len;            // tangent along segment
+    const onx = ty,   ony = -tx;              // outward normal (right of CW direction)
+
+    const OFFSET = 20; // gap from edge to dim line (px)
+    const EXT    = 5;  // extension line overshoot past dim line
+    const ARR    = 7;  // arrowhead length
+
+    const ex1 = x1 + onx*OFFSET, ey1 = y1 + ony*OFFSET;
+    const ex2 = x2 + onx*OFFSET, ey2 = y2 + ony*OFFSET;
+
+    ctx.save();
+    ctx.strokeStyle = '#445566';
+    ctx.fillStyle   = '#445566';
+    ctx.lineWidth   = 0.8;
+    ctx.setLineDash([]);
+
+    // Extension lines
+    ctx.beginPath(); ctx.moveTo(x1 + onx*3, y1 + ony*3); ctx.lineTo(ex1 + onx*EXT, ey1 + ony*EXT); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x2 + onx*3, y2 + ony*3); ctx.lineTo(ex2 + onx*EXT, ey2 + ony*EXT); ctx.stroke();
+
+    // Dimension line
+    ctx.beginPath(); ctx.moveTo(ex1, ey1); ctx.lineTo(ex2, ey2); ctx.stroke();
+
+    // Arrowheads (pointing inward toward each extremity)
+    drawArrowHead(ex1, ey1,  tx,  ty, ARR);
+    drawArrowHead(ex2, ey2, -tx, -ty, ARR);
+
+    // Label (white box background so it sits cleanly on the dim line)
+    const mx = (ex1+ex2)/2, my = (ey1+ey2)/2;
+    const rawIn = lenPx / INCH;
+    const label = (rawIn % 1 === 0 ? rawIn.toFixed(0) : rawIn.toFixed(2)) + '"';
+    const dimFs = Math.round(13 * dimSizeMultiplier);
+    const dimBgH = Math.round(18 * dimSizeMultiplier);
+    ctx.font = `bold ${dimFs}px Raleway,sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const tw = ctx.measureText(label).width + 8;
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(mx - tw/2, my - dimBgH/2, tw, dimBgH);
+    ctx.fillStyle = '#1a2a44'; ctx.fillText(label, mx, my);
+
+    ctx.restore();
+}
+
+function drawLShape(s, sel) {
+    const pts = lShapePolygon(s);
+    // Fill
+    const fill = sel ? 'rgba(201,168,76,0.12)' : 'rgba(218,230,248,0.88)';
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i=1; i<pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.restore();
+    // Border — 6 sides
+    const sides = lShapeSides(s);
+    for (const sd of sides) {
+        const etype = s.edges?.[sd.key]?.type || 'none';
+        drawBorderSegment(ctx, etype, sd.x1, sd.y1, sd.x2, sd.y2, sel);
+        if (etype !== 'none') {
+            const def = EDGE_DEFS[etype];
+            if (def?.abbr) {
+                const mx=(sd.x1+sd.x2)/2, my=(sd.y1+sd.y2)/2;
+                const dx=sd.x2-sd.x1, dy=sd.y2-sd.y1, len=Math.hypot(dx,dy)||1;
+                const lx=mx+(dy/len)*14, ly=my+(-dx/len)*14;
+                ctx.save();
+                ctx.font='bold 9px Raleway,sans-serif';
+                ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,0.85)';
+                ctx.strokeText(def.abbr,lx,ly);
+                ctx.fillStyle=def.color; ctx.fillText(def.abbr,lx,ly);
+                ctx.restore();
+            }
+        }
+    }
+    // Dimension lines outside all 6 sides of the L-shape
+    { const p = lShapePolygon(s);
+      for (let i=0; i<6; i++) {
+          const j=(i+1)%6;
+          drawDimLine(p[i][0],p[i][1],p[j][0],p[j][1], Math.hypot(p[j][0]-p[i][0],p[j][1]-p[i][1]));
+      }
+    }
+
+    // Selection outline (dashed gold)
+    if (sel) {
+        ctx.save();
+        ctx.strokeStyle='#b09030'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i=1; i<pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.closePath(); ctx.stroke();
+        ctx.setLineDash([]); ctx.restore();
+    }
+}
+
+function drawBSP(s, sel) {
+    const pts = bspPolygon(s);
+    // Fill
+    const fill = sel ? 'rgba(201,168,76,0.12)' : 'rgba(218,230,248,0.88)';
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]);
+    for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]);
+    ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); ctx.restore();
+    // Border — 8 sides
+    const sides = bspSides(s);
+    for (const sd of sides) {
+        const etype = s.edges?.[sd.key]?.type || 'none';
+        drawBorderSegment(ctx, etype, sd.x1, sd.y1, sd.x2, sd.y2, sel);
+        if (etype !== 'none') {
+            const def = EDGE_DEFS[etype];
+            if (def?.abbr) {
+                const mx=(sd.x1+sd.x2)/2, my=(sd.y1+sd.y2)/2;
+                const dx=sd.x2-sd.x1, dy=sd.y2-sd.y1, len=Math.hypot(dx,dy)||1;
+                const lx=mx+(dy/len)*14, ly=my+(-dx/len)*14;
+                ctx.save(); ctx.font='bold 9px Raleway,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+                ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,0.85)';
+                ctx.strokeText(def.abbr,lx,ly); ctx.fillStyle=def.color; ctx.fillText(def.abbr,lx,ly); ctx.restore();
+            }
+        }
+    }
+    // Dim lines for all 8 sides
+    for (let i=0;i<8;i++) {
+        const j=(i+1)%8;
+        drawDimLine(pts[i][0],pts[i][1],pts[j][0],pts[j][1], Math.hypot(pts[j][0]-pts[i][0],pts[j][1]-pts[i][1]));
+    }
+    // Selection outline
+    if (sel) {
+        ctx.save(); ctx.strokeStyle='#b09030'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]);
+        for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]);
+        ctx.closePath(); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+    }
+}
+
+function drawShape(s, sel) {
+    if (s.shapeType === 'l') { drawLShape(s, sel); return; }
+    if (s.shapeType === 'bsp') { drawBSP(s, sel); return; }
+    const r = shapeRadii(s);
+
+    // 1. Fill
+    let fill;
+    if (s.subtype === 'sink_overmount')
+        fill = sel ? 'rgba(10,25,80,0.35)' : 'rgba(18,42,120,0.82)';
+    else if (s.subtype === 'sink_undermount')
+        fill = sel ? 'rgba(50,180,50,0.25)' : 'rgba(160,240,140,0.90)';
+    else if (s.subtype === 'cooktop')
+        fill = sel ? 'rgba(210,140,40,0.18)' : 'rgba(255,240,200,0.94)';
+    else
+        fill = sel ? 'rgba(201,168,76,0.12)' : 'rgba(218,230,248,0.88)';
+    // ── Outlet: dashed rect + label (early return, no standard border) ──
+    if (s.subtype === 'outlet') {
+        ctx.fillStyle = 'rgba(60,60,60,0.15)';
+        ctx.fillRect(s.x, s.y, s.w, s.h);
+        ctx.save(); ctx.setLineDash([3,2]);
+        ctx.strokeStyle = sel ? '#b09030' : '#555'; ctx.lineWidth = sel ? 1.5 : 1;
+        ctx.strokeRect(s.x, s.y, s.w, s.h); ctx.restore();
+        const olx = s.x + s.w/2;
+        ctx.font = 'bold 12px Raleway,sans-serif'; ctx.fillStyle = '#111';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText('OUTLET', olx, s.y + s.h + 3);
+        return;
+    }
+
+    // ── Bocci: circle + label (early return, no rect) ──
+    if (s.subtype === 'bocci') {
+        const br = s.w / 2, bcx = s.x + br, bcy = s.y + br;
+        ctx.beginPath(); ctx.arc(bcx, bcy, br, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(60,60,60,0.15)'; ctx.fill();
+        ctx.save(); ctx.setLineDash([3,2]);
+        ctx.strokeStyle = sel ? '#b09030' : '#555'; ctx.lineWidth = sel ? 1.5 : 1;
+        ctx.stroke(); ctx.restore();
+        ctx.font = 'bold 12px Raleway,sans-serif'; ctx.fillStyle = '#111';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText('BOCCI', bcx, bcy + br + 3);
+        return;
+    }
+
+    roundedRectPath(ctx, s.x, s.y, s.w, s.h, r);
+    ctx.fillStyle = fill;
+    ctx.fill();
+
+    // 2. Border — each side drawn with its profile
+    const sides = [
+        { key:'top',    x1:s.x+r.nw,      y1:s.y,         x2:s.x+s.w-r.ne,   y2:s.y         },
+        { key:'right',  x1:s.x+s.w,        y1:s.y+r.ne,    x2:s.x+s.w,         y2:s.y+s.h-r.se},
+        { key:'bottom', x1:s.x+s.w-r.se,   y1:s.y+s.h,     x2:s.x+r.sw,        y2:s.y+s.h     },
+        { key:'left',   x1:s.x,             y1:s.y+s.h-r.sw,x2:s.x,             y2:s.y+r.nw    },
+    ];
+    for (const sd of sides) {
+        const etype = s.edges?.[sd.key]?.type || 'none';
+        drawBorderSegment(ctx, etype, sd.x1, sd.y1, sd.x2, sd.y2, sel);
+        // Abbreviation label outside the shape
+        if (etype !== 'none') {
+            const def = EDGE_DEFS[etype];
+            if (def?.abbr) {
+                const mx = (sd.x1+sd.x2)/2, my = (sd.y1+sd.y2)/2;
+                let lx = mx, ly = my, ALOFF = 14;
+                if (sd.key === 'top')    ly -= ALOFF;
+                if (sd.key === 'bottom') ly += ALOFF;
+                if (sd.key === 'left')   lx -= ALOFF;
+                if (sd.key === 'right')  lx += ALOFF;
+                ctx.save();
+                ctx.font = 'bold 9px Raleway,sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+                ctx.strokeText(def.abbr, lx, ly);
+                ctx.fillStyle = def.color; ctx.fillText(def.abbr, lx, ly);
+                ctx.restore();
+            }
+        }
+    }
+
+    // 2b. Corner arcs — styled per cornerEdges assignment
+    const cornerDefs = [
+        { key:'nw', cx:s.x+r.nw,     cy:s.y+r.nw,     r:r.nw, startA:Math.PI,     endA:1.5*Math.PI },
+        { key:'ne', cx:s.x+s.w-r.ne, cy:s.y+r.ne,     r:r.ne, startA:1.5*Math.PI, endA:2*Math.PI   },
+        { key:'se', cx:s.x+s.w-r.se, cy:s.y+s.h-r.se, r:r.se, startA:0,           endA:0.5*Math.PI },
+        { key:'sw', cx:s.x+r.sw,     cy:s.y+s.h-r.sw, r:r.sw, startA:0.5*Math.PI, endA:Math.PI     },
+    ];
+    for (const cd of cornerDefs) {
+        if (cd.r <= 0) continue;
+        const ctype = s.cornerEdges?.[cd.key]?.type || 'none';
+        const def = EDGE_DEFS[ctype];
+        ctx.save();
+        if (sel && ctype === 'none') { ctx.strokeStyle = '#b09030'; ctx.lineWidth = 2; ctx.setLineDash([]); }
+        else if (ctype === 'none')   { ctx.strokeStyle = '#222222'; ctx.lineWidth = 0.8; ctx.setLineDash([]); }
+        else if (ctype === 'polished') { ctx.strokeStyle = '#dd0000'; ctx.lineWidth = 2.5; ctx.setLineDash([]); }
+        else if (ctype === 'mitered')  { ctx.strokeStyle = '#7a3000'; ctx.lineWidth = 2;   ctx.setLineDash([4,3]); }
+        else if (ctype === 'special')  { ctx.strokeStyle = '#228B22'; ctx.lineWidth = 2.5; ctx.setLineDash([]); }
+        else if (ctype === 'joint')    { ctx.strokeStyle = '#e0457b'; ctx.lineWidth = 2;   ctx.setLineDash([5,4]); }
+        else if (ctype === 'waterfall'){ ctx.strokeStyle = '#006688'; ctx.lineWidth = 2;   ctx.setLineDash([]); }
+        ctx.beginPath(); ctx.arc(cd.cx, cd.cy, cd.r, cd.startA, cd.endA); ctx.stroke();
+        // Abbreviation label near arc midpoint (outside)
+        if (ctype !== 'none' && def?.abbr) {
+            const midA = (cd.startA + cd.endA) / 2;
+            const mpx = cd.cx + Math.cos(midA) * cd.r;
+            const mpy = cd.cy + Math.sin(midA) * cd.r;
+            // outward = radial direction from center
+            const ox = (mpx - cd.cx) / cd.r * 12, oy = (mpy - cd.cy) / cd.r * 12;
+            ctx.setLineDash([]);
+            ctx.font = 'bold 9px Raleway,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+            ctx.strokeText(def.abbr, mpx + ox, mpy + oy);
+            ctx.fillStyle = def.color; ctx.fillText(def.abbr, mpx + ox, mpy + oy);
+        }
+        ctx.restore();
+    }
+
+    // 3. Dimension lines outside (countertop pieces only, not sinks/cooktops)
+    if (!s.subtype) {
+        drawDimLine(s.x,     s.y,     s.x+s.w, s.y,     s.w); // top (width)  →
+        drawDimLine(s.x+s.w, s.y,     s.x+s.w, s.y+s.h, s.h); // right (height)↓
+        drawDimLine(s.x+s.w, s.y+s.h, s.x,     s.y+s.h, s.w); // bottom ←
+        drawDimLine(s.x,     s.y+s.h, s.x,     s.y,     s.h); // left ↑
+    }
+
+    // 4. Shape label (joint lines drawn in a separate top-level pass)
+    drawShapeLabel(s);
+
+    // 5. Corner radius labels
+    for (const [key, sx_, sy_, ox, oy] of [
+        ['nw', s.x,     s.y,     1, 1],
+        ['ne', s.x+s.w, s.y,    -1, 1],
+        ['se', s.x+s.w, s.y+s.h,-1,-1],
+        ['sw', s.x,     s.y+s.h, 1,-1],
+    ]) {
+        const rv = r[key];
+        if (rv <= 0) continue;
+        const lx = sx_ + ox * (rv * 0.5 + 9);
+        const ly = sy_ + oy * (rv * 0.5 + 9);
+        ctx.save();
+        ctx.font = '8px Raleway,sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+        ctx.strokeText(`R${pxToIn(rv)}"`, lx, ly);
+        ctx.fillStyle = '#cc4444'; ctx.fillText(`R${pxToIn(rv)}"`, lx, ly);
+        ctx.restore();
+    }
+
+    // 6. Selection handles
+    if (sel) {
+        const hw = Math.floor(HND/2);
+        for (const h of handles(s)) {
+            ctx.fillStyle = '#fff'; ctx.strokeStyle = '#b09030'; ctx.lineWidth = 1.5;
+            ctx.fillRect(h.px-hw, h.py-hw, HND, HND);
+            ctx.strokeRect(h.px-hw, h.py-hw, HND, HND);
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Interior joint lines
+// ─────────────────────────────────────────────────────────────
+function drawJointLines(s) {
+    if (!s.joints || s.joints.length === 0) return;
+    for (const j of s.joints) {
+        const isSel = selectedJoint?.j === j;
+        ctx.save();
+        // Clip joint lines to the actual polygon shape
+        if (s.shapeType === 'l' || s.shapeType === 'bsp') {
+            const pts = s.shapeType === 'l' ? lShapePolygon(s) : bspPolygon(s);
+            ctx.beginPath();
+            ctx.moveTo(pts[0][0], pts[0][1]);
+            for (let i=1; i<pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+            ctx.closePath(); ctx.clip();
+        }
+        ctx.strokeStyle = '#e0457b';
+        ctx.lineWidth   = isSel ? 2.5 : 1.8;
+        ctx.setLineDash([5, 4]);
+
+        if (j.axis === 'v') {
+            const jx = s.x + clamp(j.pos, 2, s.w - 2);
+            ctx.beginPath(); ctx.moveTo(jx, s.y + 2); ctx.lineTo(jx, s.y + s.h - 2); ctx.stroke();
+            ctx.setLineDash([]);
+            // Label
+            ctx.font = 'bold 8px Raleway,sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+            ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+            ctx.strokeText('JT', jx, s.y + 4);
+            ctx.fillStyle = '#e0457b'; ctx.fillText('JT', jx, s.y + 4);
+            // Selection dot
+            if (isSel) {
+                ctx.beginPath(); ctx.arc(jx, s.y + s.h/2, 5, 0, Math.PI*2);
+                ctx.fillStyle = '#e0457b'; ctx.fill();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+            }
+        } else {
+            const jy = s.y + clamp(j.pos, 2, s.h - 2);
+            ctx.beginPath(); ctx.moveTo(s.x + 2, jy); ctx.lineTo(s.x + s.w - 2, jy); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.font = 'bold 8px Raleway,sans-serif';
+            ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+            ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+            ctx.strokeText('JT', s.x + 5, jy - 2);
+            ctx.fillStyle = '#e0457b'; ctx.fillText('JT', s.x + 5, jy - 2);
+            if (isSel) {
+                ctx.beginPath(); ctx.arc(s.x + s.w/2, jy, 5, 0, Math.PI*2);
+                ctx.fillStyle = '#e0457b'; ctx.fill();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+            }
+        }
+        ctx.restore();
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Shape label (text inside shape)
+// ─────────────────────────────────────────────────────────────
+function drawShapeLabel(s) {
+    if (s.w < 14 || s.h < 10) return;
+    const cx = s.x + s.w/2, cy = s.y + s.h/2;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+    if (s.subtype === 'sink_overmount' || s.subtype === 'sink_undermount') {
+        const isOver = s.subtype === 'sink_overmount';
+        ctx.fillStyle = isOver ? '#d0e8ff' : '#1a4a10';
+        if (s.w >= 36 && s.h >= 24) {
+            ctx.font = 'bold 10px Raleway,sans-serif'; ctx.fillText('SINK', cx, cy - 8);
+            ctx.font = '9px Raleway,sans-serif';
+            ctx.fillText(isOver ? 'OVERMOUNT' : 'UNDERMOUNT', cx, cy + 5);
+            if (s.w >= 48 && s.h >= 36) {
+                ctx.fillStyle = isOver ? '#a0c8e8' : '#3a7a28'; ctx.font = '8px Raleway,sans-serif';
+                ctx.fillText(`${pxToIn(s.w)}″ × ${pxToIn(s.h)}″`, cx, cy + 17);
+            }
+        } else { ctx.font = 'bold 8px Raleway,sans-serif'; ctx.fillText('S', cx, cy); }
+        return;
+    }
+
+    if (s.subtype === 'cooktop') {
+        if (s.w >= 48 && s.h >= 32) {
+            const bx = s.w*0.22, by = s.h*0.22;
+            const br = Math.min(bx, by) * 0.65;
+            for (const [ox,oy] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+                const bpx = cx+ox*bx, bpy = cy+oy*by;
+                ctx.beginPath(); ctx.arc(bpx, bpy, Math.min(br,12), 0, Math.PI*2);
+                ctx.strokeStyle = '#886600'; ctx.lineWidth = 1.5; ctx.stroke();
+                ctx.beginPath(); ctx.arc(bpx, bpy, Math.min(br*0.38,5), 0, Math.PI*2);
+                ctx.fillStyle = '#cc8800'; ctx.fill();
+            }
+        }
+        ctx.fillStyle = '#5a3300'; ctx.font = 'bold 9px Raleway,sans-serif';
+        ctx.fillText('COOKTOP', cx, s.y + 9);
+        if (s.w >= 40 && s.h >= 24) {
+            ctx.font = '8px Raleway,sans-serif'; ctx.fillStyle = '#997700';
+            ctx.fillText(`${pxToIn(s.w)}″ × ${pxToIn(s.h)}″`, cx, s.y + s.h - 9);
+        }
+        return;
+    }
+
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Hover indicators
+// ─────────────────────────────────────────────────────────────
+function drawHoverIndicators() {
+    if (tool === 'radius' && hovCorner) {
+        ctx.save(); ctx.beginPath(); ctx.arc(hovCorner.px, hovCorner.py, 9, 0, Math.PI*2);
+        ctx.strokeStyle = '#b09030'; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.8; ctx.stroke();
+        ctx.globalAlpha = 1; ctx.restore();
+    }
+    if (tool === 'edge') {
+        if (hovEdge) {
+            ctx.save();
+            ctx.strokeStyle = '#b09030'; ctx.lineWidth = 4; ctx.globalAlpha = 0.5;
+            ctx.beginPath(); ctx.moveTo(hovEdge.x1, hovEdge.y1); ctx.lineTo(hovEdge.x2, hovEdge.y2); ctx.stroke();
+            ctx.globalAlpha = 1; ctx.restore();
+        }
+        if (hovCornerEdge) {
+            ctx.save(); ctx.beginPath(); ctx.arc(hovCornerEdge.px, hovCornerEdge.py, 9, 0, Math.PI*2);
+            ctx.strokeStyle = '#b09030'; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.8; ctx.stroke();
+            ctx.globalAlpha = 1; ctx.restore();
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Draw preview (while dragging new rect)
+// ─────────────────────────────────────────────────────────────
+function drawPreview() {
+    if (!drawing || !dStart || !dCur) return;
+    const { x, y, w, h } = normRect(dStart.x, dStart.y, dCur.x-dStart.x, dCur.y-dStart.y);
+    if (w < 1 || h < 1) return;
+    ctx.fillStyle = 'rgba(201,168,76,0.13)'; ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle = '#b09030'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([5,3]); ctx.strokeRect(x,y,w,h); ctx.setLineDash([]);
+    if (w >= 20 && h >= 14) {
+        ctx.fillStyle = '#b09030'; ctx.font = 'bold 11px Raleway,sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(`${pxToIn(w)}″ × ${pxToIn(h)}″`, x+w/2, y+h/2);
+    }
+}
+
+function render() {
+    // Grid
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, CW, CH);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(200,210,230,0.22)'; ctx.lineWidth = 0.5; ctx.setLineDash([1,5]);
+    for (let x = 0; x <= CW; x += FOOT/2) { if (x%FOOT===0) continue; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,CH); ctx.stroke(); }
+    for (let y = 0; y <= CH; y += FOOT/2) { if (y%FOOT===0) continue; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CW,y); ctx.stroke(); }
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(160,175,200,0.42)'; ctx.lineWidth = 0.75;
+    for (let x = 0; x <= CW; x += FOOT) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,CH); ctx.stroke(); }
+    for (let y = 0; y <= CH; y += FOOT) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CW,y); ctx.stroke(); }
+    ctx.restore();
+
+    shapes.forEach(s => drawShape(s, s.id === selected));
+    // Draw joint lines last so they appear on top of all shapes (sinks, cooktops, etc.)
+    shapes.forEach(s => drawJointLines(s));
+    // Draw text annotations on top
+    for (const ti of textItems) {
+        const isSel = ti.id === selectedText;
+        ctx.save();
+        ctx.font = `bold ${ti.size||12}px Raleway,sans-serif`;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        if (isSel) {
+            const w = ctx.measureText(ti.text).width;
+            const h = (ti.size||12) + 4;
+            ctx.strokeStyle = '#b09030'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+            ctx.strokeRect(ti.x - 2, ti.y - 2, w + 4, h + 4);
+            ctx.setLineDash([]);
+        }
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.strokeText(ti.text, ti.x, ti.y);
+        ctx.fillStyle = '#1c2008';
+        ctx.fillText(ti.text, ti.x, ti.y);
+        ctx.restore();
+    }
+    // Ghost text following cursor
+    if (ghostText) {
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        ctx.font = `bold ${ghostText.size||12}px Raleway,sans-serif`;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+        ctx.strokeText(ghostText.text, ghostTextPos.x, ghostTextPos.y);
+        ctx.fillStyle = '#1a2a44';
+        ctx.fillText(ghostText.text, ghostTextPos.x, ghostTextPos.y);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+    }
+    drawHoverIndicators();
+    drawPreview();
+    // Update right-panel live sections
+    if (typeof updateLiveLegend === 'function') updateLiveLegend();
+    if (typeof updatePieceSummary === 'function') updatePieceSummary();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Rulers
+// ─────────────────────────────────────────────────────────────
+function drawRulerCorner() {
+    ctxC.fillStyle = '#2d3a10'; ctxC.fillRect(0,0,RULER_SZ,RULER_SZ);
+    ctxC.strokeStyle = '#2c3812'; ctxC.lineWidth = 1;
+    ctxC.beginPath(); ctxC.moveTo(RULER_SZ-1,0); ctxC.lineTo(RULER_SZ-1,RULER_SZ); ctxC.stroke();
+    ctxC.beginPath(); ctxC.moveTo(0,RULER_SZ-1); ctxC.lineTo(RULER_SZ,RULER_SZ-1); ctxC.stroke();
+}
+function drawRulerH() {
+    ctxH.fillStyle = '#2d3a10'; ctxH.fillRect(0,0,CW,RULER_SZ);
+    ctxH.strokeStyle = '#2c3812'; ctxH.lineWidth = 1;
+    ctxH.beginPath(); ctxH.moveTo(0,RULER_SZ-1); ctxH.lineTo(CW,RULER_SZ-1); ctxH.stroke();
+    for (let x = 0; x <= CW; x += FOOT/2) {
+        const ft = x/FOOT; const major = Number.isInteger(ft);
+        ctxH.strokeStyle = major?'#8a7a40':'#3a3818'; ctxH.lineWidth = 1;
+        ctxH.beginPath(); ctxH.moveTo(x,RULER_SZ-1); ctxH.lineTo(x,RULER_SZ-1-(major?10:5)); ctxH.stroke();
+        if (major && ft > 0) { ctxH.fillStyle='#a09048'; ctxH.font='9px Raleway,sans-serif'; ctxH.textAlign='center'; ctxH.textBaseline='middle'; ctxH.fillText(`${ft}'`,x,RULER_SZ/2-1); }
+    }
+}
+function drawRulerV() {
+    ctxV.fillStyle = '#2d3a10'; ctxV.fillRect(0,0,RULER_SZ,CH);
+    ctxV.strokeStyle = '#2c3812'; ctxV.lineWidth = 1;
+    ctxV.beginPath(); ctxV.moveTo(RULER_SZ-1,0); ctxV.lineTo(RULER_SZ-1,CH); ctxV.stroke();
+    for (let y = 0; y <= CH; y += FOOT/2) {
+        const ft = y/FOOT; const major = Number.isInteger(ft);
+        ctxV.strokeStyle = major?'#8a7a40':'#3a3818'; ctxV.lineWidth = 1;
+        ctxV.beginPath(); ctxV.moveTo(RULER_SZ-1,y); ctxV.lineTo(RULER_SZ-1-(major?10:5),y); ctxV.stroke();
+        if (major && ft > 0) { ctxV.save(); ctxV.translate(RULER_SZ/2-1,y); ctxV.rotate(-Math.PI/2); ctxV.fillStyle='#a09048'; ctxV.font='9px Raleway,sans-serif'; ctxV.textAlign='center'; ctxV.textBaseline='middle'; ctxV.fillText(`${ft}'`,0,0); ctxV.restore(); }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Legend swatches
+// ─────────────────────────────────────────────────────────────
+function drawLegendSwatches() {
+    for (const [type] of Object.entries(EDGE_DEFS)) {
+        if (type === 'none') continue;
+        const el = document.getElementById(`leg-${type}`);
+        if (!el) continue;
+        const lc = el.getContext('2d');
+        lc.clearRect(0,0,el.width,el.height);
+        lc.fillStyle = 'rgba(218,230,248,0.35)'; lc.fillRect(0,0,el.width,el.height);
+        drawBorderSegment(lc, type, 3, el.height/2, el.width-3, el.height/2, false);
+    }
+    // Interior joint swatch
+    const ijEl = document.getElementById('leg-ijoint');
+    if (ijEl) {
+        const lc = ijEl.getContext('2d');
+        lc.clearRect(0,0,ijEl.width,ijEl.height);
+        lc.fillStyle = 'rgba(218,230,248,0.35)'; lc.fillRect(0,0,ijEl.width,ijEl.height);
+        lc.save();
+        lc.strokeStyle = '#e0457b'; lc.lineWidth = 1.8; lc.setLineDash([5,4]);
+        lc.beginPath(); lc.moveTo(ijEl.width/2, 2); lc.lineTo(ijEl.width/2, ijEl.height-2); lc.stroke();
+        lc.restore();
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Popup helpers
+// ─────────────────────────────────────────────────────────────
+function hideAllPopups() {
+    ['size-popup','lshape-popup','bsp-popup','sink-popup','radius-popup','edge-popup','joint-popup','text-popup'].forEach(id =>
+        document.getElementById(id).style.display = 'none');
+    currentPopup = null; pendingPlace = null; pendingCorner = null;
+    pendingEdge = null; pendingJointShape = null; pendingJointPos = null;
+}
+
+function screenPos(cvX, cvY) {
+    const r = cv.getBoundingClientRect();
+    return { x: r.left + cvX, y: r.top + cvY };
+}
+
+function showPopupAt(el, prefX, prefY) {
+    el.style.display = 'block';
+    // measure after display
+    requestAnimationFrame(() => {
+        const w = el.offsetWidth || 220, h = el.offsetHeight || 180;
+        el.style.left = Math.max(8, Math.min(prefX, window.innerWidth  - w - 10)) + 'px';
+        el.style.top  = Math.max(8, Math.min(prefY, window.innerHeight - h - 10)) + 'px';
+    });
+}
+
+// ── Size popup ──────────────────────────────────────────────
+const popupSize = document.getElementById('size-popup');
+const popW = document.getElementById('pop-w');
+const popH = document.getElementById('pop-h');
+
+function showSizePopup(defW, defH, editId) {
+    hideAllPopups();
+    editingId = editId;
+    popW.value = defW; popH.value = defH;
+    document.getElementById('pop-title').textContent = editId !== null ? 'Edit Dimensions' : 'Set Dimensions';
+    document.getElementById('pop-ok').textContent    = editId !== null ? 'Save'            : 'Add Piece';
+    currentPopup = 'size';
+    const cvRect = cv.getBoundingClientRect();
+    let lx, ly;
+    if (editId !== null) {
+        const s = byId(editId);
+        lx = cvRect.left + (s ? s.x + s.w/2 - 105 : cvRect.width/2 - 105);
+        ly = cvRect.top  + (s ? s.y - 140          : cvRect.height/2 - 90);
+    } else if (pendingPlace) {
+        lx = cvRect.left + pendingPlace.x + 20; ly = cvRect.top + pendingPlace.y - 20;
+    } else {
+        lx = cvRect.left + cvRect.width/2 - 105; ly = cvRect.top + cvRect.height/2 - 90;
+    }
+    showPopupAt(popupSize, lx, ly);
+    popW.focus(); popW.select();
+}
+function confirmSizePopup() {
+    const w = parseFloat(popW.value), h = parseFloat(popH.value);
+    if (!w || !h || w <= 0 || h <= 0) { popW.focus(); return; }
+    const wPx = Math.round(w*INCH), hPx = Math.round(h*INCH);
+    if (editingId !== null) {
+        const s = byId(editingId);
+        if (s) { pushUndo(); s.w = clamp(wPx,INCH,CW-s.x); s.h = clamp(hPx,INCH,CH-s.y); persist(); }
+    } else {
+        const px = pendingPlace ? clamp(pendingPlace.x,0,Math.max(0,CW-wPx)) : 0;
+        const py = pendingPlace ? clamp(pendingPlace.y,0,Math.max(0,CH-hPx)) : 0;
+        pushUndo();
+        shapes.push(normalizeShape({ id:nextId, label:`P${nextId}`, x:px, y:py, w:wPx, h:hPx }));
+        nextId++; persist();
+    }
+    hideAllPopups(); render(); updateStatus();
+}
+document.getElementById('pop-ok').addEventListener('click', confirmSizePopup);
+document.getElementById('pop-cancel').addEventListener('click', () => { hideAllPopups(); render(); });
+[popW, popH].forEach(inp => inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); confirmSizePopup(); }
+    if (e.key === 'Escape') { e.preventDefault(); hideAllPopups(); render(); }
+    e.stopPropagation();
+}));
+
+// ── Sink popup ───────────────────────────────────────────────
+document.getElementById('sink-btn-over').addEventListener('click', () => {
+    sinkMountType = 'overmount';
+    document.getElementById('sink-btn-over').classList.add('active');
+    document.getElementById('sink-btn-under').classList.remove('active');
+});
+document.getElementById('sink-btn-under').addEventListener('click', () => {
+    sinkMountType = 'undermount';
+    document.getElementById('sink-btn-under').classList.add('active');
+    document.getElementById('sink-btn-over').classList.remove('active');
+});
+function showSinkPopup(cvX, cvY) {
+    hideAllPopups(); pendingPlace = { x:cvX, y:cvY };
+    sinkMountType = 'overmount';
+    document.getElementById('sink-btn-over').classList.add('active');
+    document.getElementById('sink-btn-under').classList.remove('active');
+    document.getElementById('sink-w').value = 24;
+    document.getElementById('sink-h').value = 15;
+    currentPopup = 'sink';
+    const sp = screenPos(cvX, cvY);
+    showPopupAt(document.getElementById('sink-popup'), sp.x + 20, sp.y - 20);
+    document.getElementById('sink-w').focus();
+}
+function confirmSinkPopup() {
+    const w = parseFloat(document.getElementById('sink-w').value);
+    const h = parseFloat(document.getElementById('sink-h').value);
+    if (!w || !h) return;
+    const wPx = Math.round(w*INCH), hPx = Math.round(h*INCH);
+    const px = pendingPlace ? clamp(pendingPlace.x,0,Math.max(0,CW-wPx)) : 0;
+    const py = pendingPlace ? clamp(pendingPlace.y,0,Math.max(0,CH-hPx)) : 0;
+    pushUndo();
+    shapes.push(normalizeShape({ id:nextId, label:`P${nextId}`, x:px, y:py, w:wPx, h:hPx, subtype:`sink_${sinkMountType}` }));
+    nextId++; persist(); hideAllPopups(); render(); updateStatus();
+}
+document.getElementById('sink-ok').addEventListener('click', confirmSinkPopup);
+document.getElementById('sink-cancel').addEventListener('click', () => hideAllPopups());
+['sink-w','sink-h'].forEach(id => document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); confirmSinkPopup(); }
+    if (e.key === 'Escape') { e.preventDefault(); hideAllPopups(); }
+    e.stopPropagation();
+}));
+
+// ── Radius popup ─────────────────────────────────────────────
+function showRadiusPopup(corner) {
+    hideAllPopups(); pendingCorner = corner;
+    const existing = corner.s.corners?.[corner.key] || 0;
+    document.getElementById('radius-val').value = parseFloat(pxToIn(existing)) || 0;
+    document.getElementById('radius-corner-lbl').textContent = corner.key.toUpperCase();
+    currentPopup = 'radius';
+    const sp = screenPos(corner.px, corner.py);
+    showPopupAt(document.getElementById('radius-popup'), sp.x + 16, sp.y - 120);
+    const rv = document.getElementById('radius-val'); rv.focus(); rv.select();
+}
+function confirmRadiusPopup() {
+    if (!pendingCorner) return;
+    const rIn = parseFloat(document.getElementById('radius-val').value) || 0;
+    pushUndo();
+    if (!pendingCorner.s.corners) pendingCorner.s.corners = { nw:0, ne:0, se:0, sw:0 };
+    pendingCorner.s.corners[pendingCorner.key] = Math.max(0, Math.round(rIn * INCH));
+    persist(); hideAllPopups(); render();
+}
+document.getElementById('radius-ok').addEventListener('click', confirmRadiusPopup);
+document.getElementById('radius-cancel').addEventListener('click', () => hideAllPopups());
+document.getElementById('radius-val').addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); confirmRadiusPopup(); }
+    if (e.key === 'Escape') { e.preventDefault(); hideAllPopups(); }
+    e.stopPropagation();
+});
+
+// ── Edge popup ───────────────────────────────────────────────
+const edgeTypeSel = document.getElementById('edge-type-sel');
+const RECT_EDGE_LABELS = { top:'Top', right:'Right', bottom:'Bottom', left:'Left' };
+function showEdgePopup(edgeHit) {
+    hideAllPopups(); pendingEdge = edgeHit;
+    edgeTypeSel.value = edgeHit.s.edges?.[edgeHit.key]?.type || 'none';
+    const lbl = edgeHit.label || RECT_EDGE_LABELS[edgeHit.key] || edgeHit.key;
+    document.getElementById('edge-which-lbl').textContent = lbl;
+    currentPopup = 'edge';
+    const s = edgeHit.s;
+    let midX = s.x+s.w/2, midY = s.y+s.h/2;
+    if (s.shapeType !== 'l') {
+        midX = edgeHit.key === 'left' ? s.x : edgeHit.key === 'right' ? s.x+s.w : s.x+s.w/2;
+        midY = edgeHit.key === 'top'  ? s.y : edgeHit.key === 'bottom' ? s.y+s.h : s.y+s.h/2;
+    }
+    const sp = screenPos(midX, midY);
+    showPopupAt(document.getElementById('edge-popup'), sp.x - 105, sp.y - 130);
+    edgeTypeSel.focus();
+}
+function confirmEdgePopup() {
+    if (!pendingEdge) return;
+    pushUndo();
+    if (!pendingEdge.s.edges) pendingEdge.s.edges = { top:{type:'none'}, right:{type:'none'}, bottom:{type:'none'}, left:{type:'none'} };
+    pendingEdge.s.edges[pendingEdge.key] = { type: edgeTypeSel.value };
+    persist(); hideAllPopups(); render();
+}
+document.getElementById('edge-ok').addEventListener('click', confirmEdgePopup);
+document.getElementById('edge-cancel').addEventListener('click', () => hideAllPopups());
+edgeTypeSel.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); confirmEdgePopup(); }
+    if (e.key === 'Escape') { e.preventDefault(); hideAllPopups(); }
+    e.stopPropagation();
+});
+
+// ── Edge palette ──────────────────────────────────────────────────────────────
+document.querySelectorAll('.ep-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        activeEdgeType = btn.dataset.etype;
+        document.querySelectorAll('.ep-btn').forEach(b => b.classList.toggle('ep-active', b === btn));
+    });
+});
+
+// ── Backsplash popup ──────────────────────────────────────────
+let editingBspId = null;
+let pendingBspPlace = null;
+
+const bspDiagram = document.getElementById('bsp-diagram');
+const bspDiagCtx = bspDiagram.getContext('2d');
+
+function drawBspDiagram() {
+    const dc = bspDiagCtx, dw = bspDiagram.width, dh = bspDiagram.height;
+    dc.clearRect(0,0,dw,dh);
+    const W  = parseFloat(document.getElementById('bsp-W').value)||96;
+    const Hb = parseFloat(document.getElementById('bsp-Hb').value)||4;
+    const Hp = parseFloat(document.getElementById('bsp-Hp').value)||18;
+    const Wp = parseFloat(document.getElementById('bsp-Wp').value)||36;
+    const Xl = parseFloat(document.getElementById('bsp-Xl').value)||30;
+    const H  = Hb + Hp;
+    const pad = 28;
+    const sc  = Math.min((dw-pad*2)/W, (dh-pad*2)/H);
+    const ox  = (dw - W*sc)/2, oy = (dh - H*sc)/2;
+    const fs  = { x:ox, y:oy, w:W*sc, h:H*sc, pW:Wp*sc, pH:Hp*sc, pX:Xl*sc };
+    const pts = bspPolygon(fs);
+    dc.save();
+    dc.beginPath(); dc.moveTo(pts[0][0],pts[0][1]);
+    for (let i=1;i<pts.length;i++) dc.lineTo(pts[i][0],pts[i][1]);
+    dc.closePath();
+    dc.fillStyle='rgba(176,144,48,0.12)'; dc.fill();
+    dc.strokeStyle='#b09030'; dc.lineWidth=1.5; dc.stroke();
+    // Labels along each side
+    const labels = ['Wp','Hp','Xr','Hb','W','Hb','Xl','Hp'];
+    const values = [Wp, Hp, W-Xl-Wp, Hb, W, Hb, Xl, Hp];
+    for (let i=0;i<8;i++) {
+        const j=(i+1)%8;
+        const mx=(pts[i][0]+pts[j][0])/2, my=(pts[i][1]+pts[j][1])/2;
+        const dx=pts[j][0]-pts[i][0], dy=pts[j][1]-pts[i][1], len=Math.hypot(dx,dy);
+        if (len < 8) continue;
+        const nx=dy/len, ny=-dx/len; // outward normal
+        const lx=mx+nx*14, ly=my+ny*14;
+        dc.font='bold 8px Raleway,sans-serif'; dc.textAlign='center'; dc.textBaseline='middle';
+        dc.fillStyle='#b09030';
+        dc.fillText(`${labels[i]}=${values[i]}"`, lx, ly);
+    }
+    dc.restore();
+}
+['bsp-W','bsp-Hb','bsp-Hp','bsp-Wp','bsp-Xl'].forEach(id =>
+    document.getElementById(id).addEventListener('input', drawBspDiagram));
+
+function showBspPopup(defW, defHb, defHp, defWp, defXl, editId) {
+    hideAllPopups();
+    editingBspId = editId;
+    document.getElementById('bsp-W').value  = defW;
+    document.getElementById('bsp-Hb').value = defHb;
+    document.getElementById('bsp-Hp').value = defHp;
+    document.getElementById('bsp-Wp').value = defWp;
+    document.getElementById('bsp-Xl').value = defXl;
+    document.getElementById('bsp-title').textContent = editId !== null ? 'Edit Backsplash' : 'Backsplash Dimensions';
+    document.getElementById('bsp-ok').textContent    = editId !== null ? 'Save' : 'Add Piece';
+    currentPopup = 'bsp';
+    const cvRect = cv.getBoundingClientRect();
+    showPopupAt(document.getElementById('bsp-popup'), cvRect.left + cvRect.width/2 - 145, cvRect.top + 30);
+    document.getElementById('bsp-W').focus();
+    drawBspDiagram();
+}
+function confirmBspPopup() {
+    const W  = parseFloat(document.getElementById('bsp-W').value);
+    const Hb = parseFloat(document.getElementById('bsp-Hb').value);
+    const Hp = parseFloat(document.getElementById('bsp-Hp').value);
+    const Wp = parseFloat(document.getElementById('bsp-Wp').value);
+    const Xl = parseFloat(document.getElementById('bsp-Xl').value);
+    if (!W||!Hb||!Hp||!Wp||Xl<0||Wp+Xl>W) return;
+    const wPx=Math.round(W*INCH), hPx=Math.round((Hb+Hp)*INCH);
+    const pWpx=Math.round(Wp*INCH), pHpx=Math.round(Hp*INCH), pXpx=Math.round(Xl*INCH);
+    pushUndo();
+    if (editingBspId !== null) {
+        const s = byId(editingBspId);
+        if (s) { s.w=wPx; s.h=hPx; s.pW=pWpx; s.pH=pHpx; s.pX=pXpx; persist(); }
+    } else {
+        const px = pendingBspPlace ? clamp(pendingBspPlace.x,0,Math.max(0,CW-wPx)) : 0;
+        const py = pendingBspPlace ? clamp(pendingBspPlace.y,0,Math.max(0,CH-hPx)) : 0;
+        shapes.push(normalizeShape({ id:nextId, label:`P${nextId}`, x:px, y:py, w:wPx, h:hPx,
+            shapeType:'bsp', pW:pWpx, pH:pHpx, pX:pXpx }));
+        nextId++; persist();
+    }
+    hideAllPopups(); render(); updateStatus();
+}
+document.getElementById('bsp-ok').addEventListener('click', confirmBspPopup);
+document.getElementById('bsp-cancel').addEventListener('click', () => { hideAllPopups(); render(); });
+['bsp-W','bsp-Hb','bsp-Hp','bsp-Wp','bsp-Xl'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+        if (e.key==='Enter')  { e.preventDefault(); confirmBspPopup(); }
+        if (e.key==='Escape') { e.preventDefault(); hideAllPopups(); render(); }
+        e.stopPropagation();
+    });
+});
+
+// ── Joint popup ──────────────────────────────────────────────
+document.getElementById('joint-btn-v').addEventListener('click', () => {
+    jointOrientation = 'v';
+    document.getElementById('joint-btn-v').classList.add('active');
+    document.getElementById('joint-btn-h').classList.remove('active');
+});
+document.getElementById('joint-btn-h').addEventListener('click', () => {
+    jointOrientation = 'h';
+    document.getElementById('joint-btn-h').classList.add('active');
+    document.getElementById('joint-btn-v').classList.remove('active');
+});
+function showJointPopup(shape, pos, cvX, cvY) {
+    hideAllPopups();
+    pendingJointShape = shape;
+    pendingJointPos = pos;
+    jointOrientation = 'v';
+    document.getElementById('joint-btn-v').classList.add('active');
+    document.getElementById('joint-btn-h').classList.remove('active');
+    currentPopup = 'joint';
+    const sp = screenPos(cvX, cvY);
+    showPopupAt(document.getElementById('joint-popup'), sp.x + 20, sp.y - 20);
+}
+function confirmJointPopup() {
+    if (!pendingJointShape || !pendingJointPos) return;
+    const s = pendingJointShape, pos = pendingJointPos;
+    let jpos;
+    if (jointOrientation === 'v') {
+        jpos = clamp(snap(pos.px - s.x), INCH*2, s.w - INCH*2);
+    } else {
+        jpos = clamp(snap(pos.py - s.y), INCH*2, s.h - INCH*2);
+    }
+    pushUndo();
+    if (!s.joints) s.joints = [];
+    s.joints.push({ id: Date.now(), axis: jointOrientation, pos: jpos });
+    persist(); hideAllPopups(); render();
+}
+document.getElementById('joint-ok').addEventListener('click', confirmJointPopup);
+document.getElementById('joint-cancel').addEventListener('click', () => hideAllPopups());
+
+// ── L-Shape popup ────────────────────────────────────────────
+let lshapeCorner    = 'ne';
+let editingLShapeId = null;
+
+// Configuration for each corner orientation.
+// Letters A-F label the 6 sides clockwise from the polygon's first point.
+// "computed" = the 2 inner-notch letters derived from the 4 outer measurements.
+// "compute"  = function returning {computed letter: value} from all 6 values
+// "fromWH"   = converts internal {W,H,nW,nH} → {A,B,C,D,E,F}
+// "toWH"     = converts {A…F} → internal {W,H,nW,nH}
+//
+// NE: A=top, B=inner-vert(auto), C=inner-horiz(auto), D=right-partial, E=full-width, F=full-height
+// NW: A=top-partial, B=full-right, C=full-width, D=left-partial, E=inner-horiz(auto), F=inner-vert(auto)
+// SE: A=full-top, B=right-partial, C=inner-horiz(auto), D=inner-vert(auto), E=bottom-partial, F=full-left
+// SW: A=full-top, B=full-right, C=bottom-partial, D=inner-vert(auto), E=inner-horiz(auto), F=left-partial
+const L_CONF = {
+    ne: { computed:['B','C'],
+          compute:(v)=>({ B: v.F - v.D, C: v.E - v.A }),
+          fromWH:(W,H,nW,nH)=>({A:W-nW, B:nH,  C:nW,  D:H-nH, E:W,  F:H }),
+          toWH:(v)=>({W:v.E, H:v.F, nW:v.C, nH:v.B}) },
+    nw: { computed:['E','F'],
+          compute:(v)=>({ E: v.C - v.A, F: v.B - v.D }),
+          fromWH:(W,H,nW,nH)=>({A:W-nW, B:H,   C:W,   D:H-nH, E:nW, F:nH}),
+          toWH:(v)=>({W:v.C, H:v.B, nW:v.E, nH:v.F}) },
+    se: { computed:['C','D'],
+          compute:(v)=>({ C: v.A - v.E, D: v.F - v.B }),
+          fromWH:(W,H,nW,nH)=>({A:W,   B:H-nH, C:nW,  D:nH,   E:W-nW, F:H }),
+          toWH:(v)=>({W:v.A, H:v.F, nW:v.C, nH:v.D}) },
+    sw: { computed:['D','E'],
+          compute:(v)=>({ D: v.B - v.F, E: v.A - v.C }),
+          fromWH:(W,H,nW,nH)=>({A:W,   B:H,    C:W-nW, D:nH,   E:nW, F:H-nH}),
+          toWH:(v)=>({W:v.A, H:v.B, nW:v.E, nH:v.D}) },
+};
+
+const lsDiagram = document.getElementById('lshape-diagram');
+const lsDiagCtx = lsDiagram.getContext('2d');
+
+function getLsValues() {
+    const r = {};
+    for (const k of ['A','B','C','D','E','F']) r[k] = parseFloat(document.getElementById(`ls-${k}`).value) || 0;
+    return r;
+}
+function getLsWH() { return L_CONF[lshapeCorner].toWH(getLsValues()); }
+
+function setLsFromWH(W, H, nW, nH) {
+    const vals = L_CONF[lshapeCorner].fromWH(W, H, nW, nH);
+    for (const k of ['A','B','C','D','E','F'])
+        document.getElementById(`ls-${k}`).value = parseFloat((vals[k]||0).toFixed(2));
+}
+
+function updateComputed() {
+    const conf = L_CONF[lshapeCorner], v = getLsValues();
+    const computed = conf.compute(v);
+    for (const [k, val] of Object.entries(computed)) {
+        document.getElementById(`ls-${k}`).value = val > 0 ? parseFloat(val.toFixed(2)) : '';
+    }
+    drawLShapeDiagram();
+}
+
+function updateComputedStyles() {
+    const comp = L_CONF[lshapeCorner].computed;
+    for (const k of ['A','B','C','D','E','F']) {
+        const isAuto = comp.includes(k);
+        document.getElementById(`ls-${k}`).classList.toggle('auto', isAuto);
+        document.getElementById(`ls-${k}`).readOnly = isAuto;
+        document.getElementById(`lbl-${k}`).classList.toggle('auto', isAuto);
+    }
+}
+
+function setLShapeCorner(nc) {
+    const wh = getLsWH(); // save current dims before switching
+    lshapeCorner = nc;
+    ['ne','nw','se','sw'].forEach(k =>
+        document.getElementById(`lshape-${k}`).classList.toggle('active', k === nc));
+    if (wh.W > 0 && wh.H > 0 && wh.nW > 0 && wh.nH > 0)
+        setLsFromWH(wh.W, wh.H, wh.nW, wh.nH);
+    updateComputedStyles();
+    drawLShapeDiagram();
+}
+['ne','nw','se','sw'].forEach(k =>
+    document.getElementById(`lshape-${k}`).addEventListener('click', () => setLShapeCorner(k)));
+
+function drawLShapeDiagram() {
+    const dc = lsDiagCtx, dw = lsDiagram.width, dh = lsDiagram.height;
+    dc.clearRect(0, 0, dw, dh);
+    const {W, H, nW, nH} = getLsWH();
+    if (!W || !H || !nW || !nH) return;
+    const pad = 26;
+    const sc = Math.min((dw - pad*2) / W, (dh - pad*2) / H);
+    const ox = (dw - W*sc) / 2, oy = (dh - H*sc) / 2;
+    const ds = { x:ox, y:oy, w:W*sc, h:H*sc, notchW:nW*sc, notchH:nH*sc, notchCorner:lshapeCorner };
+    const pts = lShapePolygon(ds);
+    const comp = L_CONF[lshapeCorner].computed;
+    // Fill + outline
+    dc.save();
+    dc.beginPath(); dc.moveTo(pts[0][0], pts[0][1]);
+    for (let i=1; i<pts.length; i++) dc.lineTo(pts[i][0], pts[i][1]);
+    dc.closePath();
+    dc.fillStyle = 'rgba(176,144,48,0.12)'; dc.fill();
+    dc.strokeStyle = '#b09030'; dc.lineWidth = 1.5; dc.stroke();
+    dc.restore();
+    // Side labels A-F at midpoint of each segment, offset outward
+    const letters = ['A','B','C','D','E','F'];
+    for (let i=0; i<6; i++) {
+        const j = (i+1)%6;
+        const mx=(pts[i][0]+pts[j][0])/2, my=(pts[i][1]+pts[j][1])/2;
+        const dx=pts[j][0]-pts[i][0], dy=pts[j][1]-pts[i][1], len=Math.hypot(dx,dy)||1;
+        // Outward normal (right of CW direction)
+        const nx=dy/len, ny=-dx/len;
+        const LOFF = 13;
+        const lx=mx+nx*LOFF, ly=my+ny*LOFF;
+        const letter = letters[i];
+        const isComp = comp.includes(letter);
+        dc.save();
+        dc.font = `bold 10px Raleway,sans-serif`;
+        dc.textAlign = 'center'; dc.textBaseline = 'middle';
+        // Small circle background
+        dc.beginPath(); dc.arc(lx, ly, 7, 0, Math.PI*2);
+        dc.fillStyle = isComp ? '#1c2408' : '#2d3a10';
+        dc.fill();
+        dc.strokeStyle = isComp ? '#5a5230' : '#b09030'; dc.lineWidth = 1;
+        dc.stroke();
+        dc.fillStyle = isComp ? '#5a5230' : '#b09030';
+        dc.fillText(letter, lx, ly);
+        dc.restore();
+    }
+}
+
+// Wire primary inputs to update computed fields
+['A','B','C','D','E','F'].forEach(k => {
+    document.getElementById(`ls-${k}`).addEventListener('input', () => {
+        if (!document.getElementById(`ls-${k}`).readOnly) updateComputed();
+    });
+});
+
+function showLShapePopup(defW, defH, defNW, defNH, editId) {
+    hideAllPopups();
+    editingLShapeId = editId;
+    document.getElementById('lshape-title').textContent = editId !== null ? 'Edit L-Shape' : 'L-Shape Dimensions';
+    document.getElementById('lshape-ok').textContent    = editId !== null ? 'Save' : 'Add Piece';
+    setLsFromWH(defW, defH, defNW, defNH);
+    updateComputedStyles();
+    currentPopup = 'lshape';
+    const cvRect = cv.getBoundingClientRect();
+    showPopupAt(document.getElementById('lshape-popup'), cvRect.left + cvRect.width/2 - 145, cvRect.top + 30);
+    // Focus first primary input
+    const first = ['A','B','C','D','E','F'].find(k => !L_CONF[lshapeCorner].computed.includes(k));
+    const firstEl = document.getElementById(`ls-${first}`);
+    firstEl.focus(); firstEl.select();
+    drawLShapeDiagram();
+}
+function confirmLShapePopup() {
+    const {W, H, nW, nH} = getLsWH();
+    if (!W||!H||!nW||!nH||nW>=W||nH>=H) return;
+    const wPx=Math.round(W*INCH), hPx=Math.round(H*INCH);
+    const nWpx=Math.round(nW*INCH), nHpx=Math.round(nH*INCH);
+    pushUndo();
+    if (editingLShapeId !== null) {
+        const s = byId(editingLShapeId);
+        if (s) { s.w=clamp(wPx,INCH,CW-s.x); s.h=clamp(hPx,INCH,CH-s.y); s.notchW=nWpx; s.notchH=nHpx; s.notchCorner=lshapeCorner; persist(); }
+    } else {
+        const px = pendingPlace ? clamp(pendingPlace.x,0,Math.max(0,CW-wPx)) : 0;
+        const py = pendingPlace ? clamp(pendingPlace.y,0,Math.max(0,CH-hPx)) : 0;
+        shapes.push(normalizeShape({ id:nextId, label:`P${nextId}`, x:px, y:py, w:wPx, h:hPx,
+            shapeType:'l', notchW:nWpx, notchH:nHpx, notchCorner:lshapeCorner }));
+        nextId++; persist();
+    }
+    hideAllPopups(); render(); updateStatus();
+}
+document.getElementById('lshape-ok').addEventListener('click', confirmLShapePopup);
+document.getElementById('lshape-cancel').addEventListener('click', () => { hideAllPopups(); render(); });
+['A','B','C','D','E','F'].forEach(k => {
+    document.getElementById(`ls-${k}`).addEventListener('keydown', e => {
+        if (e.key === 'Enter')  { e.preventDefault(); confirmLShapePopup(); }
+        if (e.key === 'Escape') { e.preventDefault(); hideAllPopups(); render(); }
+        e.stopPropagation();
+    });
+});
+
+// ─────────────────────────────────────────────────────────────
+//  Mouse handlers
+// ─────────────────────────────────────────────────────────────
+cv.addEventListener('mousedown', e => {
+    if (currentPopup) return;
+    const p  = mousePos(e);
+    const sx = snap(p.x), sy = snap(p.y);
+
+    // ── Draw ──
+    if (tool === 'draw' || tool === 'ldraw') {
+        drawing = true; dStart = { x:sx, y:sy }; dCur = { x:sx, y:sy }; return;
+    }
+
+    // ── Sink ──
+    if (tool === 'sink') { showSinkPopup(sx, sy); return; }
+
+    // ── Cooktop ──
+    if (tool === 'cooktop') {
+        const wPx = 30*INCH, hPx = 20*INCH;
+        pushUndo();
+        shapes.push(normalizeShape({ id:nextId, label:`P${nextId}`, x:clamp(sx,0,CW-wPx), y:clamp(sy,0,CH-hPx), w:wPx, h:hPx, subtype:'cooktop' }));
+        nextId++; persist(); render(); updateStatus(); return;
+    }
+
+    // ── Outlet ──
+    if (tool === 'outlet') {
+        const wPx = 2*INCH, hPx = 4*INCH;
+        pushUndo();
+        shapes.push(normalizeShape({ id:nextId, label:`P${nextId}`, x:clamp(sx,0,CW-wPx), y:clamp(sy,0,CH-hPx), w:wPx, h:hPx, subtype:'outlet' }));
+        nextId++; persist(); render(); updateStatus(); return;
+    }
+
+    // ── Bocci ──
+    if (tool === 'bocci') {
+        const wPx = 3*INCH;
+        pushUndo();
+        shapes.push(normalizeShape({ id:nextId, label:`P${nextId}`, x:clamp(sx,0,CW-wPx), y:clamp(sy,0,CH-wPx), w:wPx, h:wPx, subtype:'bocci' }));
+        nextId++; persist(); render(); updateStatus(); return;
+    }
+
+    // ── Radius ──
+    if (tool === 'radius') {
+        const corner = nearestCorner(p.x, p.y);
+        if (corner) showRadiusPopup(corner); return;
+    }
+
+    // ── Edge ──
+    if (tool === 'edge') {
+        const ce = nearestCornerForEdge(p.x, p.y);
+        if (ce) {
+            pushUndo();
+            if (!ce.s.cornerEdges) ce.s.cornerEdges = {nw:{type:'none'},ne:{type:'none'},se:{type:'none'},sw:{type:'none'}};
+            ce.s.cornerEdges[ce.key] = { type: activeEdgeType };
+            persist(); render(); return;
+        }
+        const eh = nearestEdge(p.x, p.y);
+        if (eh) {
+            pushUndo();
+            if (!eh.s.edges) eh.s.edges = {top:{type:'none'},right:{type:'none'},bottom:{type:'none'},left:{type:'none'}};
+            eh.s.edges[eh.key] = { type: activeEdgeType };
+            persist(); render();
+        }
+        return;
+    }
+
+    // ── BSP draw ──
+    if (tool === 'bsp') {
+        drawing = true; dStart = { x:sx, y:sy }; dCur = { x:sx, y:sy }; return;
+    }
+
+    // ── Text ghost placement ──
+    if (ghostText) {
+        pushUndo();
+        const newId = Date.now();
+        textItems.push({ id: newId, x: p.x, y: p.y, text: ghostText.text, size: ghostText.size });
+        ghostText = null;
+        persist();
+        setTool('select');
+        selectedText = newId;
+        render(); return;
+    }
+
+    // ── Joint ──
+    if (tool === 'joint') {
+        // Drag existing joint?
+        const jh = hitJoint(p.x, p.y);
+        if (jh) {
+            selectedJoint = jh; draggingJoint = true; draggingJointRef = jh;
+            pushUndo(); render(); return;
+        }
+        // Add new joint
+        const hit = hitShape(p.x, p.y);
+        if (hit) {
+            showJointPopup(hit, { px: p.x, py: p.y }, p.x, p.y);
+        }
+        return;
+    }
+
+    // ── Select ──
+    // Text items are selectable/draggable in select mode from any non-draw tool
+    selectedText = null;
+    const th = hitTextItem(p.x, p.y);
+    if (th) {
+        selectedText = th.id; selected = null; selectedJoint = null;
+        movingText = true; moveTextStart = { mx: p.x, my: p.y, ox: th.x, oy: th.y };
+        render(); return;
+    }
+    // Check joint drag first
+    const jh = hitJoint(p.x, p.y);
+    if (jh) {
+        selectedJoint = jh; selected = jh.s.id;
+        draggingJoint = true; draggingJointRef = jh;
+        pushUndo(); render(); return;
+    }
+
+    const sel = byId(selected);
+    if (sel) {
+        const h = hitHandle(sel, p.x, p.y);
+        if (h) {
+            pushUndo(); resizing = true; resizeH = h.id;
+            resizeBase = { ...sel }; resizeMouse = { x:p.x, y:p.y }; return;
+        }
+    }
+    const hit = hitShape(p.x, p.y);
+    if (hit) {
+        if (selected !== hit.id) { selected = hit.id; selectedJoint = null; render(); }
+        pushUndo(); moving = true; moveOff = { x:p.x-hit.x, y:p.y-hit.y };
+    } else {
+        selected = null; selectedJoint = null; render();
+    }
+    updateStatus();
+});
+
+cv.addEventListener('mousemove', e => {
+    const p = mousePos(e);
+    document.getElementById('st-pos').innerHTML = `Cursor: <b>${(p.x/INCH).toFixed(1)}″, ${(p.y/INCH).toFixed(1)}″</b>`;
+
+    if ((tool === 'draw' || tool === 'ldraw' || tool === 'bsp') && drawing) {
+        dCur = { x:clamp(snap(p.x),0,CW), y:clamp(snap(p.y),0,CH) };
+        render(); return;
+    }
+
+    if (ghostText) { ghostTextPos = { x: p.x, y: p.y }; render(); return; }
+
+    if (movingText && moveTextStart) {
+        const ti = textItems.find(t => t.id === selectedText);
+        if (ti) {
+            ti.x = snap(moveTextStart.ox + p.x - moveTextStart.mx);
+            ti.y = snap(moveTextStart.oy + p.y - moveTextStart.my);
+            render();
+        }
+        return;
+    }
+
+    if (draggingJoint && draggingJointRef) {
+        const { s, j } = draggingJointRef;
+        if (j.axis === 'v') j.pos = clamp(snap(p.x - s.x), INCH, s.w - INCH);
+        else                j.pos = clamp(snap(p.y - s.y), INCH, s.h - INCH);
+        render(); return;
+    }
+
+    if (resizing) { applyResize(p); render(); return; }
+    if (moving) {
+        const s = byId(selected);
+        if (s) { s.x = clamp(snap(p.x-moveOff.x),0,CW-s.w); s.y = clamp(snap(p.y-moveOff.y),0,CH-s.h); render(); }
+        return;
+    }
+
+    if (tool === 'radius') {
+        const c = nearestCorner(p.x, p.y);
+        if (c !== hovCorner) { hovCorner = c; render(); }
+        cv.style.cursor = c ? 'pointer' : 'crosshair'; return;
+    }
+    if (tool === 'edge') {
+        const e2 = nearestEdge(p.x, p.y);
+        const ce = nearestCornerForEdge(p.x, p.y);
+        if (e2 !== hovEdge || ce !== hovCornerEdge) { hovEdge = e2; hovCornerEdge = ce; render(); }
+        cv.style.cursor = (e2 || ce) ? 'pointer' : 'crosshair'; return;
+    }
+    if (tool === 'joint') {
+        const jh = hitJoint(p.x, p.y);
+        cv.style.cursor = jh ? 'ew-resize' : (hitShape(p.x,p.y) ? 'crosshair' : 'default'); return;
+    }
+    if (tool === 'select') {
+        if (hitJoint(p.x, p.y)) { cv.style.cursor = 'ew-resize'; return; }
+        const sel = byId(selected);
+        if (sel) {
+            const h = hitHandle(sel, p.x, p.y);
+            if (h) { cv.style.cursor = h.cur; return; }
+        }
+        cv.style.cursor = hitShape(p.x,p.y) ? 'move' : 'default';
+    }
+});
+
+cv.addEventListener('mouseup', e => {
+    const p = mousePos(e);
+
+    if (draggingJoint) {
+        draggingJoint = false; draggingJointRef = null; persist(); return;
+    }
+
+    if ((tool === 'draw' || tool === 'ldraw' || tool === 'bsp') && drawing) {
+        drawing = false;
+        const dx = clamp(snap(p.x),0,CW) - dStart.x, dy = clamp(snap(p.y),0,CH) - dStart.y;
+        const r = normRect(dStart.x, dStart.y, dx, dy);
+        const preW  = r.w >= INCH ? parseFloat(pxToIn(r.w)) : 36;
+        const preH  = r.h >= INCH ? parseFloat(pxToIn(r.h)) : 25;
+        const placeX = r.w >= INCH ? clamp(r.x,0,CW-r.w) : clamp(dStart.x,0,CW-preW*INCH);
+        const placeY = r.h >= INCH ? clamp(r.y,0,CH-r.h) : clamp(dStart.y,0,CH-preH*INCH);
+        pendingPlace = { x:placeX, y:placeY };
+        dStart = null; dCur = null; render();
+        if (tool === 'ldraw') {
+            showLShapePopup(preW, preH, Math.round(preW/2*10)/10, Math.round(preH/2*10)/10, null);
+        } else if (tool === 'bsp') {
+            pendingBspPlace = { x: placeX, y: placeY };
+            showBspPopup(preW, 4, 18, Math.round(preW/3), Math.round(preW/3), null);
+        } else {
+            showSizePopup(preW, preH, null);
+        }
+        return;
+    }
+    if (movingText) { movingText = false; moveTextStart = null; persist(); }
+    if (moving)     { moving   = false; persist(); }
+    if (resizing)   { resizing = false; resizeH = null; persist(); }
+});
+
+cv.addEventListener('mouseleave', () => {
+    document.getElementById('st-pos').innerHTML = 'Cursor: <b>—</b>';
+    if (hovCorner || hovEdge || hovCornerEdge) { hovCorner = null; hovEdge = null; hovCornerEdge = null; render(); }
+});
+
+// Double-click: edit size OR remove joint
+cv.addEventListener('dblclick', e => {
+    if (currentPopup) return;
+    const p = mousePos(e);
+    // Remove joint on double-click in joint tool
+    if (tool === 'joint') {
+        const jh = hitJoint(p.x, p.y);
+        if (jh) {
+            pushUndo();
+            jh.s.joints = jh.s.joints.filter(j => j !== jh.j);
+            if (selectedJoint?.j === jh.j) selectedJoint = null;
+            persist(); render(); return;
+        }
+    }
+    // Edit size in select mode
+    if (tool === 'select') {
+        const hit = hitShape(p.x, p.y);
+        if (!hit) return;
+        selected = hit.id; render();
+        if (hit.shapeType === 'l') {
+            lshapeCorner = hit.notchCorner || 'ne';
+            showLShapePopup(pxToIn(hit.w), pxToIn(hit.h), pxToIn(hit.notchW||0), pxToIn(hit.notchH||0), hit.id);
+        } else if (hit.shapeType === 'bsp') {
+            showBspPopup(pxToIn(hit.w), pxToIn(hit.h-hit.pH), pxToIn(hit.pH), pxToIn(hit.pW), pxToIn(hit.pX), hit.id);
+        } else {
+            showSizePopup(pxToIn(hit.w), pxToIn(hit.h), hit.id);
+        }
+    }
+});
+
+// ─────────────────────────────────────────────────────────────
+//  Keyboard
+// ─────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+    if (currentPopup) return;
+    if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); return; }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedJoint && document.activeElement === document.body) {
+            e.preventDefault();
+            pushUndo();
+            selectedJoint.s.joints = selectedJoint.s.joints.filter(j => j !== selectedJoint.j);
+            selectedJoint = null; persist(); render(); return;
+        }
+        if (selected !== null && document.activeElement === document.body) {
+            e.preventDefault(); deleteSelected(); return;
+        }
+    }
+    if (e.key === 'Escape') {
+        ghostText = null;
+        selected = null; selectedJoint = null; drawing = false; dStart = null; dCur = null;
+        moving = false; resizing = false; draggingJoint = false;
+        hovCorner = null; hovEdge = null; hovCornerEdge = null;
+        render(); updateStatus(); return;
+    }
+    if (e.key === 'r' || e.key === 'R') setTool('draw');
+    if (e.key === 's' || e.key === 'S') setTool('select');
+});
+
+// ─────────────────────────────────────────────────────────────
+//  Tool switching
+// ── Text tool ─────────────────────────────────────────────────
+// ghostText = { text, size } while text is floating on cursor waiting to be placed
+let ghostText    = null;
+let ghostTextPos = { x: 0, y: 0 };
+
+function hitTextItem(mx, my) {
+    for (let i = textItems.length - 1; i >= 0; i--) {
+        const ti = textItems[i];
+        ctx.font = `bold ${ti.size||12}px Raleway,sans-serif`;
+        const w = ctx.measureText(ti.text).width + 4;
+        const h = (ti.size||12) + 8;
+        if (mx >= ti.x - 2 && mx <= ti.x + w && my >= ti.y - 2 && my <= ti.y + h)
+            return ti;
+    }
+    return null;
+}
+
+function openTextPopup() {
+    hideAllPopups();
+    currentPopup = 'text';
+    document.getElementById('text-content').value = '';
+    const cvRect = cv.getBoundingClientRect();
+    showPopupAt(document.getElementById('text-popup'), cvRect.left + cvRect.width/2 - 110, cvRect.top + 40);
+    document.getElementById('text-content').focus();
+}
+function confirmTextPopup() {
+    const txt = document.getElementById('text-content').value.trim();
+    if (!txt) { hideAllPopups(); setTool('select'); return; }
+    const sz = parseInt(document.getElementById('text-size').value) || 12;
+    hideAllPopups();
+    // Enter "ghost" mode — text follows cursor until user clicks to drop it
+    ghostText = { text: txt, size: sz };
+    cv.style.cursor = 'crosshair';
+    render();
+}
+document.getElementById('text-ok').addEventListener('click', confirmTextPopup);
+document.getElementById('text-cancel').addEventListener('click', () => { hideAllPopups(); setTool('select'); });
+document.getElementById('text-content').addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); confirmTextPopup(); }
+    if (e.key === 'Escape') { e.preventDefault(); hideAllPopups(); setTool('select'); }
+    e.stopPropagation();
+});
+
+// ─────────────────────────────────────────────────────────────
+const TOOL_BTNS = { draw:'btn-draw', ldraw:'btn-ldraw', bsp:'btn-bsp', select:'btn-select', radius:'btn-radius', edge:'btn-edge', joint:'btn-joint', sink:'btn-sink', cooktop:'btn-cooktop', outlet:'btn-outlet', bocci:'btn-bocci', text:'btn-text' };
+function setTool(t) {
+    ghostText = null; // cancel any floating text
+    tool = t; selected = null; selectedJoint = null;
+    drawing = false; moving = false; resizing = false; draggingJoint = false;
+    hovCorner = null; hovEdge = null; hovCornerEdge = null;
+    selectedText = null;
+    cv.style.cursor = ['draw','ldraw','bsp','sink','cooktop','outlet','bocci','radius','edge','joint'].includes(t) ? 'crosshair' : 'default';
+    document.getElementById('edge-palette').style.display = t === 'edge' ? 'flex' : 'none';
+    Object.entries(TOOL_BTNS).forEach(([k,id]) => document.getElementById(id).classList.toggle('active', k === t));
+    const labels = { draw:'Draw Rectangle', ldraw:'Draw L-Shape', bsp:'Draw Backsplash', select:'Select / Move', radius:'Add Radius', edge:'Edge Profile', joint:'Joint Line', sink:'Sink', cooktop:'Cooktop', outlet:'Outlet (2×4")', bocci:'Bocci Outlet (2" circle)', text:'Add Text' };
+    document.getElementById('st-tool').innerHTML = `Tool: <b>${labels[t]||t}</b>`;
+    render();
+}
+function deleteSelected() {
+    if (selectedText !== null) {
+        pushUndo(); textItems = textItems.filter(t => t.id !== selectedText); selectedText = null;
+        persist(); render(); return;
+    }
+    if (selected === null) return;
+    pushUndo(); shapes = shapes.filter(s => s.id !== selected); selected = null;
+    persist(); render(); updateStatus();
+}
+function updateStatus() {
+    document.getElementById('st-pieces').innerHTML = `Pieces: <b>${shapes.length}</b>`;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Toolbar buttons
+// ─────────────────────────────────────────────────────────────
+Object.entries(TOOL_BTNS).forEach(([t,id]) => document.getElementById(id).addEventListener('click', () => {
+    setTool(t);
+    if (t === 'text') openTextPopup(); // open popup immediately on button click
+}));
+document.getElementById('btn-delete').addEventListener('click', deleteSelected);
+document.getElementById('btn-undo').addEventListener('click', undo);
+
+// ─────────────────────────────────────────────────────────────
+//  Phase 3 — Right panel form
+// ─────────────────────────────────────────────────────────────
+const FORM_KEY    = 'spartan_form';
+const PRICING_KEY = 'spartan_pricing';
+let formData = { order:'', job:'', client:'', date:'', notes:'', materials:[] };
+let matNextId = 1;
+
+// ── Pricing state ─────────────────────────────────────────────
+let pricingData = { costItems:[], rooms:{}, commission:'' };
+let pricingNextId = 1;
+
+function getRoomPricing(pageId) {
+    if (!pricingData.rooms) pricingData.rooms = {};
+    const k = String(pageId);
+    if (!pricingData.rooms[k]) pricingData.rooms[k] = { installRate:'', installOverride:'', extras:[] };
+    return pricingData.rooms[k];
+}
+
+function todayStr() {
+    const d = new Date();
+    return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+function saveForm() {
+    formData.order  = document.getElementById('f-order').value;
+    formData.job    = document.getElementById('f-job').value;
+    formData.client = document.getElementById('f-client').value;
+    formData.notes  = document.getElementById('f-notes').value;
+    localStorage.setItem(FORM_KEY, JSON.stringify(formData));
+}
+
+function loadForm() {
+    try {
+        const d = JSON.parse(localStorage.getItem(FORM_KEY));
+        if (d) { formData = d; matNextId = (d.materials||[]).reduce((mx,m)=>Math.max(mx,m.id+1),1); }
+    } catch(e) {}
+    document.getElementById('f-order').value  = formData.order  || '';
+    document.getElementById('f-job').value    = formData.job    || '';
+    document.getElementById('f-client').value = formData.client || '';
+    document.getElementById('f-date').value   = formData.date   || todayStr();
+    document.getElementById('f-notes').value  = formData.notes  || '';
+    if (!formData.date) { formData.date = todayStr(); saveForm(); }
+    renderMaterials();
+}
+
+// Wire main field auto-save
+['f-order','f-job','f-client','f-notes'].forEach(id =>
+    document.getElementById(id).addEventListener('input', saveForm));
+
+// ── Material rows ────────────────────────────────────────────
+function matHtml(m) {
+    return `<div class="mat-row" id="mat-${m.id}">
+        <button class="mat-remove" onclick="removeMaterial(${m.id})" title="Remove">×</button>
+        <div><span class="mat-lbl">Color / Material Name</span>
+             <input class="mat-input" style="width:100%" placeholder="e.g. Calacatta Gold" value="${m.color||''}"
+                    oninput="updateMat(${m.id},'color',this.value)"></div>
+        <div class="mat-grid" style="margin-top:5px">
+            <div><span class="mat-lbl">Supplier</span>
+                 <input class="mat-input" placeholder="e.g. MSI" value="${m.supplier||''}"
+                        oninput="updateMat(${m.id},'supplier',this.value)"></div>
+            <div><span class="mat-lbl">Thickness</span>
+                 <select class="mat-input" onchange="updateMat(${m.id},'thickness',this.value)">
+                     <option value="2cm" ${m.thickness==='2cm'?'selected':''}>2 cm</option>
+                     <option value="3cm" ${m.thickness==='3cm'||!m.thickness?'selected':''}>3 cm</option>
+                 </select></div>
+            <div><span class="mat-lbl">Finish</span>
+                 <select class="mat-input" onchange="updateMat(${m.id},'finish',this.value)">
+                     ${['Polished','Honed','Leathered','Brushed'].map(f=>`<option value="${f}" ${m.finish===f?'selected':''}>${f}</option>`).join('')}
+                 </select></div>
+        </div>
+    </div>`;
+}
+
+function renderMaterials() {
+    document.getElementById('mat-rows').innerHTML =
+        (formData.materials||[]).map(matHtml).join('');
+}
+
+function addMaterial() {
+    const m = { id: matNextId++, color:'', supplier:'', thickness:'3cm', finish:'Polished' };
+    formData.materials.push(m);
+    saveForm(); renderMaterials();
+    // Focus first input of the new row
+    const row = document.getElementById(`mat-${m.id}`);
+    if (row) { const inp = row.querySelector('input'); if (inp) inp.focus(); }
+}
+
+function removeMaterial(id) {
+    formData.materials = formData.materials.filter(m => m.id !== id);
+    saveForm(); renderMaterials();
+}
+
+function updateMat(id, field, val) {
+    const m = formData.materials.find(m => m.id === id);
+    if (m) { m[field] = val; saveForm(); }
+}
+
+document.getElementById('add-mat-btn').addEventListener('click', addMaterial);
+
+// ── Live legend ──────────────────────────────────────────────
+function updateLiveLegend() {
+    const used = new Set();
+    let hasJoint = false;
+    for (const s of shapes) {
+        if (s.edges) {
+            for (const side of Object.values(s.edges)) {
+                if (side?.type && side.type !== 'none') used.add(side.type);
+            }
+        }
+        if (s.joints && s.joints.length) hasJoint = true;
+    }
+    const el = document.getElementById('live-legend');
+    if (!el) return;
+    if (used.size === 0 && !hasJoint) {
+        el.innerHTML = '<span class="ll-empty">No edge profiles assigned yet.</span>';
+        return;
+    }
+    const order = ['polished','mitered','special','joint','waterfall'];
+    let html = '';
+    for (const type of order) {
+        if (!used.has(type)) continue;
+        const def = EDGE_DEFS[type];
+        // Mini swatch canvas
+        const cid = `ll-swatch-${type}`;
+        html += `<div class="ll-row">
+            <canvas id="${cid}" width="46" height="14" style="flex-shrink:0;border-radius:2px;background:#0e1606"></canvas>
+            <span class="ll-abbr" style="color:${def.color}">${def.abbr}</span>
+            <span class="ll-name">${def.label}</span>
+        </div>`;
+    }
+    if (hasJoint) {
+        html += `<div class="ll-row">
+            <canvas id="ll-swatch-ijoint" width="46" height="14" style="flex-shrink:0;border-radius:2px;background:#0e1606"></canvas>
+            <span class="ll-abbr" style="color:#e0457b">JT</span>
+            <span class="ll-name">Interior Joint</span>
+        </div>`;
+    }
+    el.innerHTML = html;
+    // Draw swatches after DOM update
+    requestAnimationFrame(() => {
+        for (const type of order) {
+            if (!used.has(type)) continue;
+            const c = document.getElementById(`ll-swatch-${type}`);
+            if (c) { const gc = c.getContext('2d'); drawBorderSegment(gc, type, 2, 7, 44, 7, false); }
+        }
+        if (hasJoint) {
+            const c = document.getElementById('ll-swatch-ijoint');
+            if (c) {
+                const gc = c.getContext('2d');
+                gc.strokeStyle='#e0457b'; gc.lineWidth=1.8; gc.setLineDash([5,4]);
+                gc.beginPath(); gc.moveTo(2,7); gc.lineTo(44,7); gc.stroke(); gc.setLineDash([]);
+            }
+        }
+    });
+}
+
+// ── Piece summary ────────────────────────────────────────────
+function updatePieceSummary() {
+    const el = document.getElementById('piece-summary');
+    if (!el) return;
+    const pieces = shapes.filter(s => !s.subtype);
+    if (!pieces.length) { el.innerHTML = '<span class="ll-empty">No pieces on canvas.</span>'; return; }
+    let html = `<table class="piece-tbl">
+        <tr><th>#</th><th>Type</th><th>W</th><th>H</th></tr>`;
+    for (const s of pieces) {
+        const type = s.shapeType === 'l' ? 'L' : s.shapeType === 'bsp' ? 'BSP' : 'Rect';
+        const w = pxToIn(s.w), h = pxToIn(s.h);
+        html += `<tr><td>${s.label}</td><td>${type}</td><td>${w}"</td><td>${h}"</td></tr>`;
+    }
+    html += '</table>';
+    el.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Phase 2 — Pricing & Customer Proposal
+// ─────────────────────────────────────────────────────────────
+
+const SQFT_PX2 = 144 * INCH * INCH; // px² per square foot
+
+function calcTotalSqft() {
+    let total = 0;
+    for (const p of pages) {
+        for (const s of p.shapes) {
+            if (s.subtype) continue; // skip sinks, cooktops
+            let area = s.w * s.h;
+            if (s.shapeType === 'l') area -= (s.notchW || 0) * (s.notchH || 0);
+            total += area;
+        }
+    }
+    return total / SQFT_PX2;
+}
+
+function fmt$(v) {
+    const n = parseFloat(v) || 0;
+    return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function updatePricingSummary() { /* removed — no summary UI */ }
+
+function savePricing() {
+    localStorage.setItem(PRICING_KEY, JSON.stringify(pricingData));
+}
+
+function loadPricing() {
+    try {
+        const d = JSON.parse(localStorage.getItem(PRICING_KEY));
+        if (d) {
+            // Migrate old format (installRate/installOverride/extras at top level)
+            if (d.rooms === undefined) {
+                d.rooms = {};
+                const firstPage = pages[0];
+                if (firstPage) {
+                    d.rooms[String(firstPage.id)] = {
+                        installRate:    d.installRate    || '',
+                        installOverride:d.installOverride|| '',
+                        extras:         d.extras         || []
+                    };
+                }
+                delete d.installRate; delete d.installOverride; delete d.extras;
+            }
+            if (d.commission === undefined) d.commission = '';
+            pricingData = d;
+            pricingNextId = Math.max(
+                ...(d.costItems || []).map(c => c.id + 1),
+                ...Object.values(d.rooms||{}).flatMap(r => (r.extras||[]).map(e => e.id + 1)),
+                1
+            );
+        }
+    } catch(e) {}
+    const cel = document.getElementById('commission-input');
+    if (cel) cel.value = pricingData.commission || '';
+}
+
+// Sync cost items with formData.materials (one row per material, keyed by matId)
+function syncCostItemsWithMaterials() {
+    // Add items for any new materials
+    for (const m of formData.materials) {
+        if (!pricingData.costItems.find(ci => ci.matId === m.id)) {
+            pricingData.costItems.push({ id: pricingNextId++, matId: m.id, cost: '', byRoom: false, roomCosts: [] });
+        }
+    }
+    // Remove items whose material was deleted
+    pricingData.costItems = pricingData.costItems.filter(ci =>
+        formData.materials.find(m => m.id === ci.matId)
+    );
+    savePricing();
+}
+
+function renderCostRows() {
+    syncCostItemsWithMaterials();
+    const container = document.getElementById('cost-item-rows');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!pricingData.costItems.length) {
+        container.innerHTML = '<p class="price-internal-note" style="margin:0">Add materials in the Layout tab first.</p>';
+        return;
+    }
+
+    for (const ci of pricingData.costItems) {
+        const mat = formData.materials.find(m => m.id === ci.matId) || {};
+        // Build display name from material fields
+        const matName = [mat.color, mat.thickness, mat.finish].filter(Boolean).join(' · ') || 'Unnamed material';
+
+        let roomRowsHtml = '';
+        if (ci.byRoom) {
+            roomRowsHtml = '<div class="cost-room-rows">';
+            for (const p of pages) {
+                const rc = (ci.roomCosts || []).find(r => r.pageId === p.id) || { cost: '' };
+                roomRowsHtml += `<div class="cost-room-row">
+                    <span class="cost-room-label">${p.name}</span>
+                    <input class="cost-room-inp" type="number" min="0" step="0.01"
+                        value="${rc.cost || ''}" placeholder="0.00"
+                        data-cid="${ci.id}" data-pid="${p.id}">
+                </div>`;
+            }
+            roomRowsHtml += '</div>';
+        }
+
+        const div = document.createElement('div');
+        div.className = 'cost-row';
+        div.dataset.id = ci.id;
+        div.innerHTML = `<div class="cost-row-header">
+            <span class="cost-mat-label">${matName}</span>
+            ${!ci.byRoom ? `<input class="cost-amt-inp" type="number" min="0" step="0.01" placeholder="0.00" value="${ci.cost || ''}">` : ''}
+        </div>
+        <button class="cost-byroom-toggle${ci.byRoom ? ' on' : ''}" data-cid="${ci.id}">${ci.byRoom ? '↑ Single total' : '↓ Split by room'}</button>
+        ${roomRowsHtml}`;
+        container.appendChild(div);
+    }
+    bindCostRowEvents();
+}
+
+function bindCostRowEvents() {
+    document.querySelectorAll('.cost-amt-inp').forEach(inp => inp.addEventListener('input', e => {
+        const ci = pricingData.costItems.find(c => c.id === +e.target.closest('.cost-row').dataset.id);
+        if (ci) { ci.cost = e.target.value; savePricing(); }
+    }));
+    document.querySelectorAll('.cost-room-inp').forEach(inp => inp.addEventListener('input', e => {
+        const cid = +e.target.dataset.cid, pid = +e.target.dataset.pid;
+        const ci = pricingData.costItems.find(c => c.id === cid);
+        if (!ci) return;
+        if (!ci.roomCosts) ci.roomCosts = [];
+        let rc = ci.roomCosts.find(r => r.pageId === pid);
+        if (!rc) { rc = { pageId: pid, cost: '' }; ci.roomCosts.push(rc); }
+        rc.cost = e.target.value;
+        savePricing();
+    }));
+    document.querySelectorAll('.cost-byroom-toggle').forEach(btn => btn.addEventListener('click', e => {
+        const cid = +e.target.dataset.cid;
+        const ci = pricingData.costItems.find(c => c.id === cid);
+        if (!ci) return;
+        ci.byRoom = !ci.byRoom;
+        if (ci.byRoom) ci.roomCosts = pages.map(p => ({ pageId: p.id, cost: '' }));
+        savePricing(); renderCostRows();
+    }));
+}
+
+function renderRoomPricingRows() {
+    const container = document.getElementById('room-pricing-rows');
+    if (!container) return;
+    container.innerHTML = '';
+    for (const page of pages) {
+        const rp = getRoomPricing(page.id);
+        const roomSqft = calcPageSqft(page).toFixed(2);
+        let extrasHtml = '';
+        for (const ex of (rp.extras || [])) {
+            extrasHtml += `<div class="extra-row" data-eid="${ex.id}">
+                <input class="extra-desc-inp" type="text" placeholder="Description" value="${ex.desc||''}">
+                <input class="extra-amt-inp" type="number" min="0" step="0.01" placeholder="0.00" value="${ex.amount||''}">
+                <button class="extra-remove" data-eid="${ex.id}" data-pid="${page.id}">×</button>
+            </div>`;
+        }
+        const div = document.createElement('div');
+        div.className = 'room-pricing-section';
+        div.dataset.pid = page.id;
+        div.innerHTML = `
+            <div class="room-section-header">
+                <span class="room-section-name">${page.name}</span>
+                <span class="room-section-sqft">${roomSqft} ft²</span>
+            </div>
+            <div class="room-install-row">
+                <label class="mat-lbl">Install $/ft²</label>
+                <input class="mat-input room-rate-inp" type="number" min="0" step="0.01"
+                    placeholder="0.00" value="${rp.installRate||''}" data-pid="${page.id}">
+            </div>
+            <div class="room-install-row">
+                <label class="mat-lbl">Install override $</label>
+                <input class="mat-input room-override-inp" type="number" min="0" step="0.01"
+                    placeholder="leave blank for rate" value="${rp.installOverride||''}" data-pid="${page.id}">
+            </div>
+            <div class="mat-lbl" style="margin-top:6px">Extras</div>
+            <div class="room-extra-rows">${extrasHtml}</div>
+            <button class="add-mat-btn room-add-extra" data-pid="${page.id}" style="margin-top:4px">+ Add Extra</button>
+            <div class="room-price-check" data-pid="${page.id}"></div>
+        `;
+        container.appendChild(div);
+    }
+    bindRoomPricingEvents();
+    // Populate price check displays after DOM is built
+    for (const page of pages) updateRoomPriceDisplay(page.id);
+}
+
+function updateRoomPriceDisplay(pageId) {
+    const el = document.querySelector(`.room-price-check[data-pid="${pageId}"]`);
+    if (!el) return;
+    const page = pages.find(p => p.id === pageId);
+    if (!page) return;
+    const rp = getRoomPricing(page.id);
+    const roomSqft = calcPageSqft(page);
+    const installPreT = rp.installOverride !== ''
+        ? (parseFloat(rp.installOverride) || 0)
+        : roomSqft * (parseFloat(rp.installRate) || 0);
+    const extrasPreT = (rp.extras || []).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+    const totalInstall = installPreT + extrasPreT;
+    const perSqft = roomSqft > 0 ? totalInstall / roomSqft : 0;
+    if (totalInstall === 0) {
+        el.innerHTML = '<span class="price-check-empty">Enter install rate or override to see $/ft²</span>';
+        return;
+    }
+    el.innerHTML = `<div class="price-check-label">Install + Extras (before tax)</div>
+        <div class="price-check-row">
+            <span class="price-check-name">Total install</span>
+            <span class="price-check-val">${fmt$(totalInstall)}</span>
+        </div>
+        <div class="price-check-row">
+            <span class="price-check-name">Effective $/ft²</span>
+            <span class="price-check-val">${roomSqft > 0 ? fmt$(perSqft) + '/ft²' : '—'}</span>
+        </div>`;
+}
+
+function updateAllRoomPriceDisplays() {
+    for (const page of pages) updateRoomPriceDisplay(page.id);
+}
+
+function bindRoomPricingEvents() {
+    document.querySelectorAll('.room-rate-inp').forEach(inp => inp.addEventListener('input', e => {
+        const pid = +e.target.dataset.pid;
+        getRoomPricing(pid).installRate = e.target.value;
+        savePricing(); updateRoomPriceDisplay(pid);
+    }));
+    document.querySelectorAll('.room-override-inp').forEach(inp => inp.addEventListener('input', e => {
+        const pid = +e.target.dataset.pid;
+        getRoomPricing(pid).installOverride = e.target.value;
+        savePricing(); updateRoomPriceDisplay(pid);
+    }));
+    document.querySelectorAll('.extra-desc-inp').forEach(inp => inp.addEventListener('input', e => {
+        const pid = +e.target.closest('.room-pricing-section').dataset.pid;
+        const eid = +e.target.closest('.extra-row').dataset.eid;
+        const ex = (getRoomPricing(pid).extras||[]).find(x => x.id === eid);
+        if (ex) { ex.desc = e.target.value; savePricing(); }
+    }));
+    document.querySelectorAll('.extra-amt-inp').forEach(inp => inp.addEventListener('input', e => {
+        const pid = +e.target.closest('.room-pricing-section').dataset.pid;
+        const eid = +e.target.closest('.extra-row').dataset.eid;
+        const ex = (getRoomPricing(pid).extras||[]).find(x => x.id === eid);
+        if (ex) { ex.amount = e.target.value; savePricing(); updateRoomPriceDisplay(pid); }
+    }));
+    document.querySelectorAll('.extra-remove').forEach(btn => btn.addEventListener('click', e => {
+        const pid = +e.target.dataset.pid, eid = +e.target.dataset.eid;
+        const rp = getRoomPricing(pid);
+        rp.extras = (rp.extras||[]).filter(x => x.id !== eid);
+        savePricing(); renderRoomPricingRows();
+    }));
+    document.querySelectorAll('.room-add-extra').forEach(btn => btn.addEventListener('click', e => {
+        const rp = getRoomPricing(+e.target.dataset.pid);
+        if (!rp.extras) rp.extras = [];
+        rp.extras.push({ id: pricingNextId++, desc: '', amount: '' });
+        savePricing(); renderRoomPricingRows();
+    }));
+}
+
+// ── Tab switching ─────────────────────────────────────────────
+document.getElementById('ptab-layout').addEventListener('click', () => {
+    document.getElementById('ptab-layout').classList.add('active');
+    document.getElementById('ptab-pricing').classList.remove('active');
+    document.getElementById('layout-panel').style.display = '';
+    document.getElementById('pricing-panel').style.display = 'none';
+});
+document.getElementById('ptab-pricing').addEventListener('click', () => {
+    document.getElementById('ptab-pricing').classList.add('active');
+    document.getElementById('ptab-layout').classList.remove('active');
+    document.getElementById('layout-panel').style.display = 'none';
+    document.getElementById('pricing-panel').style.display = '';
+    syncPageOut();
+    renderCostRows();
+    renderRoomPricingRows();
+    const cel = document.getElementById('commission-input');
+    if (cel) cel.value = pricingData.commission || '';
+});
+
+function calcPageSqft(page) {
+    let total = 0;
+    for (const s of page.shapes) {
+        if (s.subtype) continue;
+        let area = s.w * s.h;
+        if (s.shapeType === 'l') area -= (s.notchW||0) * (s.notchH||0);
+        total += area;
+    }
+    return total / SQFT_PX2;
+}
+
+function calcRoomPricing(page) {
+    const TAX      = 1.14975; // 1 + GST(5%) + QST(9.975%)
+    const totalSqft = calcTotalSqft();
+    const roomSqft  = calcPageSqft(page);
+    const ratio     = totalSqft > 0 ? roomSqft / totalSqft : 0;
+    const rp        = getRoomPricing(page.id);
+
+    // Raw material costs for this room
+    const matEntries = [];
+    for (const ci of pricingData.costItems) {
+        const mat = formData.materials.find(m => m.id === ci.matId) || {};
+        let preT = 0;
+        if (ci.byRoom) {
+            const rc = (ci.roomCosts||[]).find(r => r.pageId === page.id);
+            preT = parseFloat(rc?.cost||0);
+            if (preT <= 0) continue;
+        } else {
+            preT = (parseFloat(ci.cost)||0) * ratio;
+        }
+        matEntries.push({
+            color:     mat.color     || '',
+            supplier:  mat.supplier  || '',
+            thickness: mat.thickness || '',
+            finish:    mat.finish    || '',
+            preT
+        });
+    }
+
+    // Room-specific install cost
+    const installPreT = rp.installOverride !== ''
+        ? (parseFloat(rp.installOverride)||0)
+        : roomSqft * (parseFloat(rp.installRate)||0);
+
+    // Room-specific extras
+    const extrasPreT = (rp.extras||[]).reduce((s,e) => s+(parseFloat(e.amount)||0), 0);
+
+    // Global commission (capped at 500) proportional to this room's sqft share
+    const commissionTotal = Math.min(parseFloat(pricingData.commission)||0, 500);
+    const commissionPreT  = commissionTotal * ratio;
+
+    // Blend install + extras + commission proportionally into each material by material cost
+    const totalAddons  = installPreT + extrasPreT + commissionPreT;
+    const totalMatPreT = matEntries.reduce((s,m) => s + m.preT, 0);
+    for (const m of matEntries) {
+        const share = totalMatPreT > 0
+            ? (m.preT / totalMatPreT) * totalAddons
+            : (matEntries.length > 0 ? totalAddons / matEntries.length : 0);
+        m.blendedPreT = m.preT + share;
+        m.total = m.blendedPreT * TAX;
+    }
+
+    const roomTotal = matEntries.reduce((s,m) => s + m.total, 0);
+    return { roomSqft, matEntries, roomTotal };
+}
+
+// ── Generate Proposal PDF (customer-facing) ───────────────────
+function generateProposal() {
+    const jsPDFLib = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if (!jsPDFLib) { alert('jsPDF library not loaded.'); return; }
+    syncPageOut();
+
+    const doc    = new jsPDFLib({ unit:'pt', format:'letter' });
+    const PW=612, PH=792, ML=45, MR=45, CW=612-45-45, FOOTER_H=62;
+    const BRAND  = [45, 58, 16];
+    const ACCENT = [176, 144, 48];
+    const TBL_BG = [240, 237, 216];
+    const BODY_T = [38, 32, 12];
+
+    let y = 90;
+
+    function addPageFooter() {
+        doc.setFillColor(248, 246, 238);
+        doc.rect(0, PH-FOOTER_H+1, PW, FOOTER_H, 'F');
+        doc.setDrawColor(...BRAND);
+        doc.setLineWidth(0.6);
+        doc.line(ML, PH-FOOTER_H, PW-MR, PH-FOOTER_H);
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(7);
+        doc.setTextColor(90, 76, 38);
+        doc.text('Soumission valide 30 jours. Les prix sont sujets à changement sans préavis.', PW/2, PH-48, {align:'center'});
+        doc.text('Quote valid for 30 days. Prices subject to change without notice.', PW/2, PH-38, {align:'center'});
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(...BRAND);
+        doc.text('SPARTAN INSTALLATIONS INC.  |  4058 Boul. Le Corbusier, Laval QC H7L 5R2  |  450-973-8686', PW/2, PH-24, {align:'center'});
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6.5);
+        doc.setTextColor(120, 100, 50);
+        doc.text('GST 72430 5677 RT0001  /  QST 1226651001 TQ0001', PW/2, PH-12, {align:'center'});
+    }
+
+    function newPdfPage() { doc.addPage(); y = 32; addPageFooter(); }
+    function checkY(n) { if (y + n > PH - FOOTER_H - 10) newPdfPage(); }
+    function sectionHead(title) {
+        checkY(28);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(...BRAND);
+        doc.text(title, ML, y);
+        doc.setDrawColor(...ACCENT); doc.setLineWidth(0.75);
+        doc.line(ML, y+3, PW-MR, y+3);
+        y += 16;
+    }
+
+    // Header
+    doc.setFillColor(...BRAND); doc.rect(0, 0, PW, 70, 'F');
+    doc.setFillColor(...ACCENT); doc.rect(0, 68, PW, 2.5, 'F');
+    doc.addImage(LOGO_DATA_URL, 'PNG', ML, 8, 48, 48);
+    doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(255,255,255);
+    doc.text('SPARTAN INSTALLATIONS INC.', ML+58, 30);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...ACCENT);
+    doc.text('SOUMISSION / ESTIMATE', ML+58, 48);
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255);
+    doc.text(`Soumission #: ${formData.order || '—'}`, PW-MR, 22, {align:'right'});
+    doc.setFont('helvetica','italic'); doc.setFontSize(7); doc.setTextColor(...ACCENT);
+    doc.text(`Estimate #: ${formData.order || '—'}`, PW-MR, 31, {align:'right'});
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255);
+    doc.text(`Date : ${formData.date || todayStr()}`, PW-MR, 44, {align:'right'});
+    // Valid until: +30 days
+    const validUntil = (() => {
+        try { const d=new Date(formData.date||new Date()); d.setDate(d.getDate()+30);
+            return d.toLocaleDateString('fr-CA',{year:'numeric',month:'long',day:'numeric'}); }
+        catch(e){ return ''; }
+    })();
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255);
+    doc.text(`Valide jusqu'au : ${validUntil}`, PW-MR, 57, {align:'right'});
+    doc.setFont('helvetica','italic'); doc.setFontSize(6.5); doc.setTextColor(...ACCENT);
+    doc.text(`Valid until: ${validUntil}`, PW-MR, 65, {align:'right'});
+    addPageFooter();
+
+    // Bill To banner
+    doc.setFillColor(...TBL_BG); doc.rect(ML, y, CW, 46, 'F');
+    doc.setDrawColor(...ACCENT); doc.setLineWidth(0.5); doc.rect(ML, y, CW, 46, 'S');
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...BRAND);
+    doc.text('FACTURÉ À', ML+6, y+11);
+    doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(120,100,50);
+    doc.text('Bill to', ML+54, y+11);
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(...BODY_T);
+    doc.text(formData.client || '—', ML+6, y+26);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(80,68,30);
+    doc.text(formData.job || '', ML+6, y+38);
+    y += 56;
+
+    // Layout drawings — each with a cost panel on the right
+    const PANEL_W = 148; // width of right-side cost panel
+    const savedIdx = currentPageIdx;
+    dimSizeMultiplier = 1.5; // 50% bigger dim numbers in proposal PDF
+    // Estimate cost panel content height
+    function panelContentH(matEntries) {
+        let h = 27; // room name header + separator
+        for (const m of matEntries) {
+            h += 12; // color bar
+            const det = [m.supplier, m.thickness, m.finish].filter(Boolean).join('');
+            if (det) h += 9; // details line
+            h += 14 + 16 + 6; // before-tax block (14) + after-tax block (16) + separator (6)
+        }
+        h += 16; // bottom padding
+        return h;
+    }
+
+    // Crop canvas to shape bounding box so small rooms fill the image area
+    function croppedCanvasData(page) {
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (const s of page.shapes) {
+            x0 = Math.min(x0, s.x); y0 = Math.min(y0, s.y);
+            x1 = Math.max(x1, s.x + s.w); y1 = Math.max(y1, s.y + s.h);
+        }
+        for (const ti of (page.textItems || [])) {
+            x0 = Math.min(x0, ti.x); y0 = Math.min(y0, ti.y);
+            x1 = Math.max(x1, ti.x + 80); y1 = Math.max(y1, ti.y + 20);
+        }
+        if (!isFinite(x0)) return { dataURL: cv.toDataURL('image/png'), w: cv.width, h: cv.height };
+        const pad = 100; // generous padding for dim labels (OFFSET=20 + label=27 + safety)
+        const cx  = Math.max(0, Math.floor(x0 - pad));
+        const cy  = Math.max(0, Math.floor(y0 - pad));
+        const cx2 = Math.min(cv.width,  Math.ceil(x1 + pad));
+        const cy2 = Math.min(cv.height, Math.ceil(y1 + pad));
+        const cw = cx2 - cx, ch = cy2 - cy;
+        const tmp = document.createElement('canvas');
+        tmp.width = cw; tmp.height = ch;
+        tmp.getContext('2d').drawImage(cv, cx, cy, cw, ch, 0, 0, cw, ch);
+        return { dataURL: tmp.toDataURL('image/png'), w: cw, h: ch };
+    }
+
+    for (let pi=0; pi<pages.length; pi++) {
+        const page = pages[pi];
+        currentPageIdx = pi; syncPageIn(); render();
+
+        const { dataURL: imgData, w: natW, h: natH } = croppedCanvasData(page);
+        const { roomSqft, matEntries, roomTotal } = calcRoomPricing(page);
+        const contentH = panelContentH(matEntries);
+
+        // Fixed zones: image always left 364pt, panel always right 148pt
+        const IMG_ZONE_W = CW - PANEL_W - 10; // 364pt
+        const MAX_IMG_H  = 200;
+        const scale = Math.min(IMG_ZONE_W / natW, MAX_IMG_H / natH);
+        const imgW = natW * scale, imgH = natH * scale;
+        const panelH = Math.max(imgH, contentH);
+        const totalBlockH = 24 + panelH + 20;
+
+        // Ensure the entire block stays on one page
+        if (y + totalBlockH > PH - FOOTER_H - 10) newPdfPage();
+
+        // Section header — French bold, English small italic on line below
+        doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...BRAND);
+        doc.text(`DISPOSITION — ${page.name.toUpperCase()}`, ML, y);
+        doc.setFont('helvetica','italic'); doc.setFontSize(7); doc.setTextColor(120,100,50);
+        doc.text('Layout', ML, y + 8);
+        doc.setDrawColor(...ACCENT); doc.setLineWidth(0.75);
+        doc.line(ML, y + 11, PW-MR, y + 11);
+        y += 20;
+
+        // Center image horizontally within its fixed zone
+        const imgX = ML + Math.floor((IMG_ZONE_W - imgW) / 2);
+        // Center image vertically within panel height
+        const imgY = y + Math.floor((panelH - imgH) / 2);
+        doc.addImage(imgData, 'PNG', imgX, imgY, imgW, imgH);
+
+        // Panel — always fixed position and width
+        const px = ML + IMG_ZONE_W + 10, pw = PANEL_W;
+        doc.setFillColor(...TBL_BG);
+        doc.rect(px, y, pw, panelH, 'F');
+        doc.setDrawColor(...ACCENT); doc.setLineWidth(0.5);
+        doc.rect(px, y, pw, panelH, 'S');
+
+        let py2 = y + 12;
+
+        // Room name header
+        doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...BRAND);
+        doc.text(page.name.toUpperCase(), px + pw/2, py2, {align:'center'});
+        py2 += 5;
+        doc.setDrawColor(...ACCENT); doc.setLineWidth(0.4);
+        doc.line(px+5, py2, px+pw-5, py2); py2 += 10;
+
+        // One block per material
+        for (const m of matEntries) {
+            // Color name bar
+            doc.setFillColor(...BRAND);
+            doc.rect(px+3, py2-8, pw-6, 12, 'F');
+            doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
+            doc.text(doc.splitTextToSize(m.color||'Matériau', pw-14)[0], px+6, py2);
+            py2 += 11;
+            // Details
+            const det = [m.supplier, m.thickness, m.finish].filter(Boolean).join('  |  ');
+            if (det) {
+                doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(100,85,40);
+                for (const l of doc.splitTextToSize(det, pw-10)) { doc.text(l, px+5, py2); py2 += 8; }
+            }
+            // Pre-tax — French bold, English italic
+            doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(80,68,30);
+            doc.text('Avant taxes :', px+5, py2);
+            doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(130,110,55);
+            doc.text('before tax', px+5, py2+7);
+            doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...BODY_T);
+            doc.text(fmt$(m.blendedPreT), px+pw-5, py2+3, {align:'right'});
+            py2 += 14;
+            // After-tax — French bold, English italic
+            doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(80,68,30);
+            doc.text('Taxes incluses :', px+5, py2);
+            doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(130,110,55);
+            doc.text('with taxes', px+5, py2+7);
+            doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...BRAND);
+            doc.text(fmt$(m.total), px+pw-5, py2+3, {align:'right'});
+            py2 += 16;
+            doc.setDrawColor(200,185,140); doc.setLineWidth(0.3);
+            doc.line(px+5, py2, px+pw-5, py2); py2 += 6;
+        }
+
+        y += panelH + 16;
+    }
+    dimSizeMultiplier = 1; // reset
+    currentPageIdx = savedIdx; syncPageIn(); render();
+
+    // Notes
+    if (formData.notes && formData.notes.trim()) {
+        sectionHead('NOTES');
+        doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...BODY_T);
+        const lines = doc.splitTextToSize(formData.notes, CW);
+        for (const line of lines) { checkY(13); doc.text(line, ML, y); y += 13; }
+        y += 4;
+    }
+
+    // Terms note
+    checkY(20);
+    y += 6;
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(80,68,30);
+    doc.text('Tous les prix incluent les taxes TPS (5 %) et TVQ (9,975 %).', ML, y, {maxWidth:CW});
+    y += 10;
+    doc.setFont('helvetica','italic'); doc.setFontSize(7); doc.setTextColor(120,100,50);
+    doc.text('All prices include GST (5%) and QST (9.975%).', ML, y, {maxWidth:CW});
+    y += 12;
+
+    const fname = `SI-${(formData.order||'000').replace(/[^a-zA-Z0-9_-]/g,'-')}_Proposal_${(formData.client||'Client').replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')}.pdf`;
+    doc.save(fname);
+}
+
+document.getElementById('btn-gen-proposal').addEventListener('click', generateProposal);
+
+document.getElementById('commission-input').addEventListener('input', e => {
+    let v = parseFloat(e.target.value) || 0;
+    if (v > 500) { v = 500; e.target.value = '500'; }
+    pricingData.commission = v > 0 ? String(v) : '';
+    savePricing();
+});
+
+// ─────────────────────────────────────────────────────────────
+//  Phase 4 — Save / Load / New / Export PDF / Print
+// ─────────────────────────────────────────────────────────────
+
+function quoteFilename(ext) {
+    const order = (formData.order || 'XXXX').replace(/[^a-zA-Z0-9_-]/g, '-');
+    const job   = (formData.job   || 'Quote').replace(/[^a-zA-Z0-9_-]/g, '_');
+    return `SI-${order}_${job}.${ext}`;
+}
+
+// ── Save Quote ────────────────────────────────────────────────
+function saveQuote() {
+    syncPageOut();
+    const bundle = {
+        version: 4,
+        pages: pages.map(p => ({ id:p.id, name:p.name, shapes:p.shapes, textItems:p.textItems, nextId:p.nextId })),
+        currentPageIdx,
+        formData,
+        pricingData
+    };
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = quoteFilename('json');
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+// ── Load Quote ────────────────────────────────────────────────
+function loadQuote() {
+    syncPageOut();
+    const hasData = pages.some(p => p.shapes.length || p.textItems.length) || pages.length > 1
+                 || formData.order || formData.job || formData.client;
+    if (hasData && !confirm('Loading a file will replace all current canvas and form data. Continue?')) return;
+    document.getElementById('load-file-input').click();
+}
+
+document.getElementById('load-file-input').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+        try {
+            const bundle = JSON.parse(evt.target.result);
+            pages = (bundle.pages || []).map(p => ({
+                id: p.id || 1, name: p.name || 'Page 1',
+                shapes: (p.shapes || []).map(normalizeShape),
+                textItems: p.textItems || [], nextId: p.nextId || 1, _undo: []
+            }));
+            if (!pages.length) pages = [{ id:1, name:'Page 1', shapes:[], textItems:[], nextId:1, _undo:[] }];
+            currentPageIdx = Math.max(0, Math.min(bundle.currentPageIdx || 0, pages.length - 1));
+            _nextPageId = Math.max(...pages.map(p => p.id), 1) + 1;
+            syncPageIn();
+            if (bundle.formData) {
+                formData = bundle.formData;
+                matNextId = (formData.materials || []).reduce((mx, m) => Math.max(mx, m.id + 1), 1);
+                document.getElementById('f-order').value  = formData.order  || '';
+                document.getElementById('f-job').value    = formData.job    || '';
+                document.getElementById('f-client').value = formData.client || '';
+                document.getElementById('f-date').value   = formData.date   || todayStr();
+                document.getElementById('f-notes').value  = formData.notes  || '';
+                renderMaterials();
+            }
+            if (bundle.pricingData) {
+                const pd = bundle.pricingData;
+                // Migrate old format if needed
+                if (pd.rooms === undefined) {
+                    pd.rooms = {};
+                    const fp = pages[0];
+                    if (fp) pd.rooms[String(fp.id)] = { installRate:pd.installRate||'', installOverride:pd.installOverride||'', extras:pd.extras||[] };
+                    delete pd.installRate; delete pd.installOverride; delete pd.extras;
+                }
+                if (pd.commission === undefined) pd.commission = '';
+                pricingData = pd;
+                pricingNextId = Math.max(
+                    ...(pricingData.costItems||[]).map(c => c.id+1),
+                    ...Object.values(pricingData.rooms||{}).flatMap(r => (r.extras||[]).map(e => e.id+1)),
+                    1
+                );
+                savePricing();
+            }
+            selected = null; selectedJoint = null; selectedText = null;
+            persist();
+            renderPageTabs();
+            render(); updateStatus();
+        } catch (err) {
+            alert('Could not load file — make sure it is a valid Spartan quote (.json) file.');
+        }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+});
+
+// ── New Quote ─────────────────────────────────────────────────
+function newQuote() {
+    if (!confirm('Start a new quote? All current canvas and form data will be cleared.')) return;
+    pages = [{ id:1, name:'Page 1', shapes:[], textItems:[], nextId:1, _undo:[] }];
+    currentPageIdx = 0; _nextPageId = 2;
+    syncPageIn();
+    formData = { order:'', job:'', client:'', date:todayStr(), notes:'', materials:[] };
+    matNextId = 1;
+    document.getElementById('f-order').value  = '';
+    document.getElementById('f-job').value    = '';
+    document.getElementById('f-client').value = '';
+    document.getElementById('f-date').value   = formData.date;
+    document.getElementById('f-notes').value  = '';
+    renderMaterials();
+    pricingData = { costItems:[], rooms:{}, commission:'' };
+    pricingNextId = 1;
+    const cel = document.getElementById('commission-input');
+    if (cel) cel.value = '';
+    ['spartan_v4','spartan_v3','spartan_v2', FORM_KEY, PRICING_KEY].forEach(k => localStorage.removeItem(k));
+    selected = null; selectedJoint = null; selectedText = null;
+    renderPageTabs();
+    render(); updateStatus();
+}
+
+// ── Export PDF ────────────────────────────────────────────────
+function hexToRgb(hex) {
+    return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+}
+
+function exportPDF() {
+    const jsPDFLib = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if (!jsPDFLib) { alert('jsPDF library not loaded. Check your internet connection and try again.'); return; }
+
+    // Flush active page to pages[] before reading
+    syncPageOut();
+
+    const doc      = new jsPDFLib({ unit:'pt', format:'letter' });
+    const PW = 612, PH = 792, ML = 45, MR = 45;
+    const CW       = PW - ML - MR;
+    const FOOTER_H = 54;
+    // ── Brand palette (RGB) ──
+    const BRAND  = [45,  58,  16];   // #2d3a10 — Spartan army olive
+    const ACCENT = [176, 144, 48];   // #b09030 — warm khaki/gold
+    const TBL_BG = [240, 237, 216];  // warm parchment table rows
+    const BODY_T = [38,  32,  12];   // warm near-black body text
+
+    let y = 84; // below header (logo height + padding)
+
+    function newPdfPage() {
+        doc.addPage();
+        y = 32;
+        addPageFooter();
+    }
+    function checkY(needed) {
+        if (y + needed > PH - FOOTER_H - 10) newPdfPage();
+    }
+    function sectionHead(title) {
+        checkY(28);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(...BRAND);
+        doc.text(title, ML, y);
+        doc.setDrawColor(...ACCENT);
+        doc.setLineWidth(0.75);
+        doc.line(ML, y + 3, PW - MR, y + 3);
+        y += 15;
+    }
+    function addPageFooter() {
+        // thin brand-green rule
+        doc.setDrawColor(...BRAND);
+        doc.setLineWidth(0.6);
+        doc.line(ML, PH - FOOTER_H, PW - MR, PH - FOOTER_H);
+        // subtle tinted background
+        doc.setFillColor(248, 246, 238);
+        doc.rect(0, PH - FOOTER_H + 1, PW, FOOTER_H, 'F');
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(7.5);
+        doc.setTextColor(90, 76, 38);
+        doc.text('This quote is valid for 30 days. All measurements are approximate and subject to final field verification.', PW / 2, PH - 34, { align:'center' });
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(...BRAND);
+        doc.text('SPARTAN INSTALLATIONS INC.', PW / 2, PH - 19, { align:'center' });
+    }
+
+    // ── Header banner (army olive) ────────────────────────────
+    doc.setFillColor(...BRAND);
+    doc.rect(0, 0, PW, 70, 'F');
+    // khaki accent stripe at bottom
+    doc.setFillColor(...ACCENT);
+    doc.rect(0, 68, PW, 2.5, 'F');
+    // Logo image (left side)
+    doc.addImage(LOGO_DATA_URL, 'PNG', ML, 8, 48, 48);
+    // Company name + tagline (offset right of logo)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(17);
+    doc.setTextColor(255, 255, 255);
+    doc.text('SPARTAN INSTALLATIONS INC.', ML + 58, 30);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...ACCENT);
+    doc.text('Countertop Quote', ML + 58, 48);
+    // right side — order & date
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`Quote #: ${formData.order || '—'}`, PW - MR, 30, { align:'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...ACCENT);
+    doc.text(`Date: ${formData.date || todayStr()}`, PW - MR, 48, { align:'right' });
+
+    addPageFooter();
+
+    // ── Job Details ──────────────────────────────────────────
+    sectionHead('JOB DETAILS');
+    const fields = [['Job Name', formData.job], ['Client', formData.client], ['Order #', formData.order], ['Date', formData.date]];
+    for (const [lbl, val] of fields) {
+        checkY(14);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(80, 68, 30);
+        doc.text(lbl.toUpperCase(), ML, y);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...BODY_T);
+        doc.text(val || '—', ML + 78, y);
+        y += 14;
+    }
+
+    // ── Materials (shown once) ────────────────────────────────
+    if (formData.materials && formData.materials.length) {
+        y += 6; sectionHead('MATERIALS');
+        doc.setFillColor(...TBL_BG);
+        doc.rect(ML, y - 9, CW, 13, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...BRAND);
+        const mc = [ML+3, ML+175, ML+265, ML+355];
+        ['COLOR / MATERIAL NAME', 'SUPPLIER', 'THICKNESS', 'FINISH'].forEach((h, i) => doc.text(h, mc[i], y - 1));
+        y += 6;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...BODY_T);
+        for (const m of formData.materials) {
+            checkY(13);
+            [m.color||'—', m.supplier||'—', m.thickness||'—', m.finish||'—'].forEach((v, i) => doc.text(v, mc[i], y));
+            y += 13;
+        }
+    }
+
+    // ── Per-page drawings (all pages) ────────────────────────
+    // Render each page to the live canvas synchronously (single JS tick = no visible flicker)
+    const savedIdx = currentPageIdx;
+    for (let pi = 0; pi < pages.length; pi++) {
+        currentPageIdx = pi;
+        syncPageIn();
+        render();
+        y += 8; sectionHead(`DRAWING — ${pages[pi].name}`);
+        const imgData = cv.toDataURL('image/png');
+        const maxH    = Math.min(255, PH - FOOTER_H - y - 20);
+        const scale   = Math.min(CW / cv.width, maxH / cv.height);
+        const imgW    = cv.width * scale, imgH = cv.height * scale;
+        checkY(imgH + 10);
+        doc.addImage(imgData, 'PNG', ML, y, imgW, imgH);
+        y += imgH + 16;
+    }
+    // Restore original page
+    currentPageIdx = savedIdx;
+    syncPageIn();
+    render();
+
+    // ── Collect edge types & pieces from ALL pages ────────────
+    const usedTypes = new Set();
+    let hasInternalJoint = false;
+    const allPieces = [];
+    for (const p of pages) {
+        for (const s of p.shapes) {
+            if (s.edges) for (const side of Object.values(s.edges)) { if (side?.type && side.type !== 'none') usedTypes.add(side.type); }
+            if (s.cornerEdges) for (const ce of Object.values(s.cornerEdges)) { if (ce?.type && ce.type !== 'none') usedTypes.add(ce.type); }
+            if (s.joints?.length) hasInternalJoint = true;
+            if (!s.subtype) allPieces.push({ ...s, _page: p.name });
+        }
+    }
+
+    // ── Edge Profile Legend ──────────────────────────────────
+    if (usedTypes.size || hasInternalJoint) {
+        y += 4; sectionHead('EDGE PROFILE LEGEND');
+        const typeOrder = ['polished','mitered','special','joint','waterfall'];
+        for (const type of typeOrder) {
+            if (!usedTypes.has(type)) continue;
+            const def = EDGE_DEFS[type];
+            const [r, g, b] = hexToRgb(def.color);
+            checkY(12);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(r, g, b);
+            doc.text(def.abbr, ML + 3, y);
+            doc.setFont('helvetica', 'normal'); doc.setTextColor(...BODY_T);
+            doc.text(def.label, ML + 30, y);
+            y += 12;
+        }
+        if (hasInternalJoint) {
+            checkY(12);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(224, 69, 123);
+            doc.text('JT', ML + 3, y);
+            doc.setFont('helvetica', 'normal'); doc.setTextColor(...BODY_T);
+            doc.text('Interior Joint Line', ML + 30, y);
+            y += 12;
+        }
+    }
+
+    // ── Piece Summary (all pages, with page column) ──────────
+    if (allPieces.length) {
+        y += 4; sectionHead('PIECE SUMMARY');
+        doc.setFillColor(...TBL_BG);
+        doc.rect(ML, y - 9, CW, 13, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...BRAND);
+        const pc = [ML+3, ML+30, ML+120, ML+185, ML+258];
+        ['#', 'TYPE', 'WIDTH', 'DEPTH', 'PAGE'].forEach((h, i) => doc.text(h, pc[i], y - 1));
+        y += 6;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...BODY_T);
+        for (const s of allPieces) {
+            checkY(13);
+            const type = s.shapeType==='l' ? 'L-Shape' : s.shapeType==='bsp' ? 'Backsplash' : 'Rectangle';
+            [s.label, type, `${pxToIn(s.w)}"`, `${pxToIn(s.h)}"`, s._page].forEach((v, i) => doc.text(String(v), pc[i], y));
+            y += 13;
+        }
+    }
+
+    // ── Notes ────────────────────────────────────────────────
+    if (formData.notes && formData.notes.trim()) {
+        y += 6; sectionHead('NOTES / SPECIAL INSTRUCTIONS');
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...BODY_T);
+        const lines = doc.splitTextToSize(formData.notes, CW);
+        for (const line of lines) {
+            checkY(13);
+            doc.text(line, ML, y);
+            y += 13;
+        }
+    }
+
+    doc.save(quoteFilename('pdf'));
+}
+
+// ── Print ─────────────────────────────────────────────────────
+function printQuote() { window.print(); }
+
+// ── Wire buttons ──────────────────────────────────────────────
+document.getElementById('btn-save-quote').addEventListener('click', saveQuote);
+document.getElementById('btn-load-quote').addEventListener('click', loadQuote);
+document.getElementById('btn-new-quote').addEventListener('click', newQuote);
+document.getElementById('btn-export-pdf').addEventListener('click', exportPDF);
+document.getElementById('btn-print-quote').addEventListener('click', printQuote);
+
+// ─────────────────────────────────────────────────────────────
+//  Page management
+// ─────────────────────────────────────────────────────────────
+let _nextPageId = 2;
+
+function renderPageTabs() {
+    const bar = document.getElementById('page-tabs');
+    const addBtn = document.getElementById('pg-add');
+    // Remove old tabs (not the add button)
+    [...bar.querySelectorAll('.pg-tab')].forEach(el => el.remove());
+    pages.forEach((p, idx) => {
+        const tab = document.createElement('div');
+        tab.className = 'pg-tab' + (idx === currentPageIdx ? ' active' : '');
+        tab.dataset.idx = idx;
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'pg-tab-name';
+        nameEl.textContent = p.name;
+        nameEl.contentEditable = 'false';
+        nameEl.spellcheck = false;
+
+        // Double-click to rename
+        nameEl.addEventListener('dblclick', e => {
+            e.stopPropagation();
+            nameEl.contentEditable = 'true';
+            nameEl.focus();
+            const range = document.createRange();
+            range.selectNodeContents(nameEl);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+        });
+        nameEl.addEventListener('blur', () => {
+            nameEl.contentEditable = 'false';
+            const newName = nameEl.textContent.trim() || p.name;
+            nameEl.textContent = newName;
+            p.name = newName;
+            persist();
+        });
+        nameEl.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); nameEl.blur(); }
+            if (e.key === 'Escape') { nameEl.textContent = p.name; nameEl.blur(); }
+            e.stopPropagation(); // don't trigger canvas shortcuts
+        });
+
+        tab.addEventListener('mousedown', e => {
+            if (nameEl.contentEditable === 'true') return;
+            if (e.target.classList.contains('pg-tab-del')) return;
+            switchPage(idx);
+        });
+
+        tab.appendChild(nameEl);
+
+        // Delete button (only if more than 1 page)
+        if (pages.length > 1) {
+            const del = document.createElement('span');
+            del.className = 'pg-tab-del';
+            del.textContent = '×';
+            del.title = 'Delete page';
+            del.addEventListener('click', e => { e.stopPropagation(); deletePage(idx); });
+            tab.appendChild(del);
+        }
+
+        bar.insertBefore(tab, addBtn);
+    });
+}
+
+function switchPage(idx) {
+    if (idx === currentPageIdx) return;
+    // Clear transient selection state
+    selected = null; selectedJoint = null; selectedText = null;
+    moving = false; resizing = false; drawing = false;
+    ghostText = null; pendingPlace = null;
+    syncPageOut();
+    currentPageIdx = idx;
+    syncPageIn();
+    persist();
+    renderPageTabs();
+    render(); updateStatus();
+}
+
+function addPage() {
+    syncPageOut();
+    const id = _nextPageId++;
+    pages.push({ id, name: `Page ${id}`, shapes:[], textItems:[], nextId:1, _undo:[] });
+    // switch to new page
+    selected = null; selectedJoint = null; selectedText = null;
+    currentPageIdx = pages.length - 1;
+    syncPageIn();
+    persist();
+    renderPageTabs();
+    render(); updateStatus();
+}
+
+function deletePage(idx) {
+    if (pages.length <= 1) return;
+    if (!confirm(`Delete "${pages[idx].name}"? This cannot be undone.`)) return;
+    pages.splice(idx, 1);
+    if (currentPageIdx >= pages.length) currentPageIdx = pages.length - 1;
+    syncPageIn();
+    selected = null; selectedJoint = null; selectedText = null;
+    persist();
+    renderPageTabs();
+    render(); updateStatus();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Init
+// ─────────────────────────────────────────────────────────────
+(function initSession() {
+    const hasSession = localStorage.getItem('spartan_v4') || localStorage.getItem('spartan_v3');
+    if (hasSession) {
+        const resume = confirm('A previous session was found.\n\nResume previous session?\n\n(Cancel = start fresh)');
+        if (!resume) {
+            ['spartan_v4','spartan_v3','spartan_v2', FORM_KEY, PRICING_KEY].forEach(k => localStorage.removeItem(k));
+        }
+    }
+})();
+load();
+loadForm();
+loadPricing();
+// Compute _nextPageId from loaded pages
+_nextPageId = Math.max(...pages.map(p => p.id), 1) + 1;
+renderPageTabs();
+document.getElementById('pg-add').addEventListener('click', addPage);
+drawRulerCorner(); drawRulerH(); drawRulerV();
+render(); updateStatus();
+</script>
+</body>
+</html>
