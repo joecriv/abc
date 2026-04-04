@@ -764,23 +764,28 @@ function snapMeasurePoint(mx, my) {
         } else if (s.shapeType === 'bsp') {
             for (const pt of bspPolygon(s))  candidates.push([pt[0], pt[1]]);
         } else if (s.shapeType === 'circle') {
-            // cardinal points
             const r = s.w/2, cx = s.x+r, cy = s.y+r;
             candidates.push([cx-r,cy],[cx+r,cy],[cx,cy-r],[cx,cy+r]);
         } else {
             candidates.push([s.x,s.y],[s.x+s.w,s.y],[s.x+s.w,s.y+s.h],[s.x,s.y+s.h]);
-            // also midpoints of each side
             candidates.push([s.x+s.w/2,s.y],[s.x+s.w,s.y+s.h/2],[s.x+s.w/2,s.y+s.h],[s.x,s.y+s.h/2]);
         }
         for (const [cx,cy] of candidates) {
             const d = Math.hypot(mx-cx, my-cy);
-            if (d < bestD) { bestD = d; best = { x:cx, y:cy }; }
+            if (d < bestD) { bestD = d; best = { x:cx, y:cy, shapeId:s.id, rx:cx-s.x, ry:cy-s.y }; }
         }
     }
     if (best) return best;
-    // Grid snap to 0.25"
     const su = INCH / 4;
-    return { x: Math.round(mx/su)*su, y: Math.round(my/su)*su };
+    return { x: Math.round(mx/su)*su, y: Math.round(my/su)*su, shapeId:null, rx:0, ry:0 };
+}
+
+// Resolve measurement endpoints — if linked to a shape, use shape position + relative offset
+function resolveMeasureXY(m) {
+    let x1=m.x1, y1=m.y1, x2=m.x2, y2=m.y2;
+    if (m.s1) { const s=byId(m.s1); if(s){x1=s.x+m.r1x;y1=s.y+m.r1y;} }
+    if (m.s2) { const s=byId(m.s2); if(s){x2=s.x+m.r2x;y2=s.y+m.r2y;} }
+    return {x1,y1,x2,y2};
 }
 
 function drawOneMeasurement(m, hover) {
@@ -844,7 +849,10 @@ function drawOneMeasurement(m, hover) {
 }
 
 function drawMeasurements() {
-    for (const m of measurements) drawOneMeasurement(m, null);
+    for (const m of measurements) {
+        const r = resolveMeasureXY(m);
+        drawOneMeasurement({...m, x1:r.x1, y1:r.y1, x2:r.x2, y2:r.y2}, null);
+    }
     if (tool !== 'measure') return;
     if (measurePt1 && measureHover) {
         drawOneMeasurement({ x1:measurePt1.x, y1:measurePt1.y }, measureHover);
@@ -2802,12 +2810,13 @@ cv.addEventListener('mousedown', e => {
     if (tool === 'measure') {
         // Check if clicking near an existing measurement's dim line (not endpoints) to select it
         for (const m of measurements) {
+            const rv = resolveMeasureXY(m);
             const off = m.offset || 0;
-            const len = Math.hypot(m.x2-m.x1, m.y2-m.y1);
+            const len = Math.hypot(rv.x2-rv.x1, rv.y2-rv.y1);
             if (len < 1) continue;
-            const tx=(m.x2-m.x1)/len, ty=(m.y2-m.y1)/len;
+            const tx=(rv.x2-rv.x1)/len, ty=(rv.y2-rv.y1)/len;
             const onx=ty, ony=-tx, O=20+off;
-            const ex1=m.x1+onx*O, ey1=m.y1+ony*O, ex2=m.x2+onx*O, ey2=m.y2+ony*O;
+            const ex1=rv.x1+onx*O, ey1=rv.y1+ony*O, ex2=rv.x2+onx*O, ey2=rv.y2+ony*O;
             const dLine = distToSegment(p.x, p.y, ex1, ey1, ex2, ey2);
             if (dLine < 10) {
                 measurePt1 = null; measureHover = null;
@@ -2821,7 +2830,9 @@ cv.addEventListener('mousedown', e => {
             measureHover = null;
         } else {
             pushUndo();
-            measurements.push({ id: Date.now(), x1: measurePt1.x, y1: measurePt1.y, x2: sp.x, y2: sp.y });
+            measurements.push({ id: Date.now(),
+                x1: measurePt1.x, y1: measurePt1.y, s1: measurePt1.shapeId, r1x: measurePt1.rx, r1y: measurePt1.ry,
+                x2: sp.x, y2: sp.y, s2: sp.shapeId, r2x: sp.rx, r2y: sp.ry });
             measurePt1 = null; measureHover = null;
             persist(); render();
         }
@@ -2964,15 +2975,17 @@ cv.addEventListener('mousedown', e => {
             }
         }
     }
-    // Measurements: click near any line/endpoint to select for deletion
+    // Measurements: click near dim line to select
     selectedMeasure = null;
     for (const m of measurements) {
-        const d1   = Math.hypot(p.x-m.x1, p.y-m.y1);
-        const d2   = Math.hypot(p.x-m.x2, p.y-m.y2);
-        const dH   = distToSegment(p.x, p.y, m.x1, m.y1, m.x2, m.y1);  // horizontal arm
-        const dV   = distToSegment(p.x, p.y, m.x2, m.y1, m.x2, m.y2);  // vertical arm
-        const dDiag= distToSegment(p.x, p.y, m.x1, m.y1, m.x2, m.y2);  // diagonal
-        if (Math.min(d1, d2, dH, dV, dDiag) < 12) { selectedMeasure = m.id; render(); return; }
+        const rv = resolveMeasureXY(m);
+        const off = m.offset || 0;
+        const len = Math.hypot(rv.x2-rv.x1, rv.y2-rv.y1);
+        if (len < 1) continue;
+        const tx2=(rv.x2-rv.x1)/len, ty2=(rv.y2-rv.y1)/len;
+        const onx2=ty2, ony2=-tx2, O2=20+off;
+        const dLine = distToSegment(p.x, p.y, rv.x1+onx2*O2, rv.y1+ony2*O2, rv.x2+onx2*O2, rv.y2+ony2*O2);
+        if (dLine < 12) { selectedMeasure = m.id; render(); return; }
     }
     // Text items are selectable/draggable in select mode from any non-draw tool
     selectedText = null;
