@@ -1194,24 +1194,24 @@ function nearestEdge(mx, my) {
                 if (d < bestD) { bestD = d; best = { s, key:sd.key, label:sd.key, x1:sd.x1, y1:sd.y1, x2:sd.x2, y2:sd.y2 }; }
             }
         } else {
+            // Shorten straight edges to exclude chamfered/radiused corners
             const r = shapeRadii(s);
-            const cands = [
-                { key:'top',    x1:s.x,       y1:s.y,       x2:s.x+s.w,   y2:s.y,       d:Math.abs(my-s.y)        },
-                { key:'bottom', x1:s.x+s.w,   y1:s.y+s.h,   x2:s.x,       y2:s.y+s.h,   d:Math.abs(my-(s.y+s.h))  },
-                { key:'left',   x1:s.x,       y1:s.y+s.h,   x2:s.x,       y2:s.y,       d:Math.abs(mx-s.x)        },
-                { key:'right',  x1:s.x+s.w,   y1:s.y,       x2:s.x+s.w,   y2:s.y+s.h,   d:Math.abs(mx-(s.x+s.w))  },
-            ];
-            for (const c of cands) {
-                if (c.key === 'top' || c.key === 'bottom') {
-                    if (mx < s.x-EDGE_THRESH || mx > s.x+s.w+EDGE_THRESH) continue;
-                } else {
-                    if (my < s.y-EDGE_THRESH || my > s.y+s.h+EDGE_THRESH) continue;
-                }
-                if (c.d < bestD) { bestD = c.d; best = { s, key:c.key, label:c.key, x1:c.x1, y1:c.y1, x2:c.x2, y2:c.y2 }; }
-            }
-            // Chamfer diagonal edges
             const ch = shapeChamfers(s);
             const chB2 = shapeChamfersB(s);
+            const tnw = ch.nw || r.nw || 0, tne = ch.ne || r.ne || 0;
+            const bsw = ch.sw || r.sw || 0, bse = ch.se || r.se || 0;
+            const lnw = chB2.nw || r.nw || 0, lsw = chB2.sw || r.sw || 0;
+            const rne = chB2.ne || r.ne || 0, rse = chB2.se || r.se || 0;
+            const cands = [
+                { key:'top',    x1:s.x+tnw,       y1:s.y,       x2:s.x+s.w-tne, y2:s.y       },
+                { key:'bottom', x1:s.x+s.w-bse,   y1:s.y+s.h,   x2:s.x+bsw,     y2:s.y+s.h   },
+                { key:'left',   x1:s.x,           y1:s.y+s.h-lsw, x2:s.x,        y2:s.y+lnw   },
+                { key:'right',  x1:s.x+s.w,       y1:s.y+rne,   x2:s.x+s.w,     y2:s.y+s.h-rse },
+            ];
+            for (const c of cands) {
+                const d = distToSegment(mx, my, c.x1, c.y1, c.x2, c.y2);
+                if (d < bestD) { bestD = d; best = { s, key:c.key, label:c.key, x1:c.x1, y1:c.y1, x2:c.x2, y2:c.y2 }; }
+            }
             const diagCands = [
                 { key:'diag_nw', x1:s.x+ch.nw,     y1:s.y,           x2:s.x,          y2:s.y+chB2.nw       },
                 { key:'diag_ne', x1:s.x+s.w-ch.ne, y1:s.y,           x2:s.x+s.w,      y2:s.y+chB2.ne       },
@@ -2910,17 +2910,27 @@ cv.addEventListener('mousedown', e => {
                 }
                 stripX = clamp(stripX, 0, CW - stripW);
                 stripY = clamp(stripY, 0, CH - stripH);
+                // Determine which edge of the strip faces the original piece
+                let stripMiterEdge;
+                if (eh.key === 'top') stripMiterEdge = 'bottom';
+                else if (eh.key === 'bottom') stripMiterEdge = 'top';
+                else if (eh.key === 'left') stripMiterEdge = 'right';
+                else if (eh.key === 'right') stripMiterEdge = 'left';
+                else stripMiterEdge = isHoriz ? (ony > 0 ? 'top' : 'bottom') : (onx > 0 ? 'left' : 'right');
+                const stripEdges = {top:{type:'none'},right:{type:'none'},bottom:{type:'none'},left:{type:'none'}};
+                stripEdges[stripMiterEdge] = {type:'mitered'};
                 shapes.push(normalizeShape({
-                    id: nextId, label: 'Miter Strip', x: stripX, y: stripY, w: stripW, h: stripH
+                    id: nextId, label: 'Miter Strip', x: stripX, y: stripY, w: stripW, h: stripH,
+                    edges: stripEdges
                 }));
                 nextId++;
-                persist(); setTool('select'); render(); updateStatus();
+                persist(); render(); updateStatus();
                 return;
             }
             pushUndo();
             if (eh.key.startsWith('diag_')) {
                 if (!eh.s.chamferEdges) eh.s.chamferEdges = {};
-                eh.s.chamferEdges[eh.key] = { type: activeEdgeType };
+                eh.s.chamferEdges[eh.key.replace('diag_','')] = { type: activeEdgeType };
             } else {
                 if (!eh.s.edges) {
                     if (eh.s.shapeType === 'circle') eh.s.edges = {arc:{type:'none'}};
@@ -2929,7 +2939,7 @@ cv.addEventListener('mousedown', e => {
                 }
                 eh.s.edges[eh.key] = { type: activeEdgeType };
             }
-            persist(); setTool('select'); render();
+            persist(); render();
         }
         return;
     }
